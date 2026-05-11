@@ -27,15 +27,12 @@ html, body {
   gap: 14px;
   padding: 32px;
   z-index: 4;
-  pointer-events: auto;
-  cursor: pointer;
-  background:
-    radial-gradient(circle at center, rgba(20, 28, 44, 0.45) 0%, rgba(0, 0, 0, 0.85) 65%);
-  transition: opacity 800ms ease;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(20, 28, 44, 0.34) 0%, rgba(0, 0, 0, 0.6) 65%);
+  transition: opacity 1100ms ease;
 }
 #drop-overlay[data-state="hover"] {
-  background:
-    radial-gradient(circle at center, rgba(60, 120, 180, 0.5) 0%, rgba(0, 0, 0, 0.85) 65%);
+  background: radial-gradient(circle at center, rgba(60, 120, 180, 0.5) 0%, rgba(0, 0, 0, 0.85) 65%);
 }
 #drop-overlay.dismissed {
   opacity: 0;
@@ -63,6 +60,116 @@ html, body {
   color: rgba(214, 247, 255, 0.85);
 }
 
+.corner-button {
+  position: fixed;
+  top: 18px;
+  z-index: 6;
+  padding: 8px 14px;
+  border: 1px solid rgba(127, 236, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(0, 8, 12, 0.6);
+  color: rgba(214, 247, 255, 0.82);
+  font: 700 11px/1 ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+.corner-button:hover {
+  border-color: rgba(156, 255, 207, 0.5);
+  background: rgba(8, 22, 28, 0.78);
+  color: #f1fffb;
+}
+#upload-button {
+  left: 18px;
+}
+
+.corner-panel {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 6;
+  width: 260px;
+  border: 1px solid rgba(127, 236, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(0, 8, 12, 0.7);
+  backdrop-filter: blur(12px);
+  font: 12px/1.4 ui-monospace, monospace;
+  color: rgba(214, 247, 255, 0.82);
+  overflow: hidden;
+}
+.corner-panel .panel-toggle {
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.corner-panel .panel-toggle::after {
+  content: " \25BE";
+  float: right;
+  transition: transform 200ms ease;
+}
+.corner-panel[data-collapsed="false"] .panel-toggle::after {
+  transform: rotate(180deg);
+}
+.corner-panel .panel-body {
+  display: none;
+  padding: 4px 14px 14px;
+  border-top: 1px solid rgba(127, 236, 255, 0.12);
+}
+.corner-panel[data-collapsed="false"] .panel-body {
+  display: block;
+}
+.panel-section {
+  margin-top: 12px;
+}
+.panel-section h4 {
+  margin: 0 0 6px;
+  font: 700 10px/1 ui-monospace, monospace;
+  color: rgba(156, 255, 207, 0.7);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+}
+.panel-row label {
+  flex: 0 0 auto;
+  color: rgba(214, 247, 255, 0.7);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.panel-row input[type="range"] {
+  flex: 1 1 auto;
+  accent-color: #9cffcf;
+}
+.panel-row span.value {
+  flex: 0 0 36px;
+  text-align: right;
+  font: 11px/1 ui-monospace, monospace;
+  color: rgba(214, 247, 255, 0.6);
+}
+.panel-row select {
+  flex: 1 1 auto;
+  padding: 4px 6px;
+  border: 1px solid rgba(127, 236, 255, 0.22);
+  background: rgba(0, 8, 12, 0.7);
+  color: rgba(214, 247, 255, 0.85);
+  font: inherit;
+  border-radius: 4px;
+}
+
 #hud {
   position: fixed;
   left: 18px;
@@ -88,13 +195,19 @@ html, body {
   bottom: 18px;
   transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 4px;
   z-index: 5;
   pointer-events: auto;
 }
+.piano-row {
+  display: flex;
+  gap: 4px;
+}
 .piano-key {
   width: 36px;
-  height: 48px;
+  height: 44px;
   border-radius: 5px;
   border: 1px solid rgba(127, 236, 255, 0.22);
   background: rgba(2, 10, 14, 0.62);
@@ -105,6 +218,10 @@ html, body {
   user-select: none;
   backdrop-filter: blur(8px);
   transition: background 120ms ease, transform 80ms ease;
+}
+.piano-key.upper {
+  height: 36px;
+  color: rgba(255, 220, 200, 0.78);
 }
 .piano-key:hover { background: rgba(20, 60, 80, 0.65); }
 .piano-key.held {

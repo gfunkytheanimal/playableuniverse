@@ -98,8 +98,8 @@ export class MemoryField {
     this.renderer.setClearColor(prevColor, prevAlpha);
   }
 
-  decay(dt) {
-    const decay = Math.pow(0.9985, dt * 60);
+  decay(dt, decayPerFrame = 0.9985) {
+    const decay = Math.pow(decayPerFrame, dt * 60);
     this.quad.material = this.decayMat;
     this.decayMat.uniforms.uPrev.value = this.ping.texture;
     this.decayMat.uniforms.uDecay.value = decay;

@@ -17,10 +17,33 @@ import { setupInput } from './camera/Input.js';
 import { Piano } from './interaction/Piano.js';
 import { DropZone } from './ui/DropZone.js';
 import { HUD } from './ui/HUD.js';
+import { AdvancedPanel } from './ui/AdvancedPanel.js';
 
 const canvas = document.getElementById('stage');
 canvas.style.width = '100%';
 canvas.style.height = '100%';
+
+const params = {
+  forceGain: 1,
+  damping: 0.993,
+  swirlBias: 1,
+  timeScale: 1,
+  pointSize: 2.4,
+  bloomStrength: 1.1,
+  exposure: 1.1,
+  memoryBlend: 0.6,
+  audioReactivity: 1.2,
+  memoryDecay: 0.9985,
+  spawnRadius: 78,
+  palette: 'spectral'
+};
+
+const PALETTES = {
+  spectral: { hueShift: 0, paletteMix: 0 },
+  cool:     { hueShift: 3.4, paletteMix: 0 },
+  warm:     { hueShift: 0.7, paletteMix: 0 },
+  mono:     { hueShift: 1.6, paletteMix: 1 }
+};
 
 const engine = new Engine(canvas);
 const clock = new Clock();
@@ -38,15 +61,22 @@ const mapper = new EventMapper({ forces, memory });
 bus.on('event', (e) => mapper.handle(e, clock.songTime));
 
 const audio = new AudioInput();
+const dropZone = new DropZone({
+  overlay: document.getElementById('drop-overlay'),
+  button: document.getElementById('upload-button'),
+  input: document.getElementById('file-input')
+}, (file) => audio.loadFile(file));
+
 audio.onSongStart = (duration, seed) => {
   clock.startSong(duration);
-  particles.reset(seed);
+  particles.reset(seed, params.spawnRadius);
   forces.list.length = 0;
   memory.clear();
   mapper.originPlaced = false;
   mapper.eventCount = 0;
   scaleCamera.zoom = 0.18;
   scaleCamera.targetZoom = 0.42;
+  dropZone.dismissOverlay();
 };
 
 const analyzer = new SpectralAnalyzer(audio);
@@ -55,13 +85,16 @@ const sectioner = new Sectioner(analyzer);
 onsets.attach(bus);
 sectioner.attach(bus);
 
-const piano = new Piano(bus, document.getElementById('piano'));
-new DropZone(document.getElementById('drop-overlay'), (file) => audio.loadFile(file));
+const piano = new Piano(bus, document.getElementById('piano'), {
+  onTrigger: () => dropZone.dismissOverlay()
+});
 
 const hud = new HUD({
   scaleEl: document.getElementById('hud-scale'),
   timeEl: document.getElementById('hud-time')
 }, clock, scaleCamera);
+
+new AdvancedPanel(document.getElementById('advanced-panel'), params);
 
 setupInput(canvas, scaleCamera);
 window.addEventListener('resize', () => {
@@ -76,19 +109,34 @@ const loop = new Loop({
     analyzer.update();
     onsets.update(clock.songTime);
     sectioner.update(clock.songTime);
+
+    mapper.audioReactivity = params.audioReactivity;
+
     forces.update(dt);
-    memory.decay(dt);
+    memory.decay(dt, params.memoryDecay);
     mapper.tick(dt);
 
     const songEnergy = analyzer.rms;
-    particles.step(dt, forces, memory, songEnergy, clock.songTime);
+    particles.step(dt, forces, memory, songEnergy, clock.songTime, {
+      forceGain: params.forceGain,
+      damping: params.damping,
+      swirlBias: params.swirlBias,
+      timeScale: params.timeScale
+    });
     scaleCamera.update(dt, particles);
 
-    renderer.update();
+    const palette = PALETTES[params.palette] ?? PALETTES.spectral;
+    renderer.update({
+      pointSize: params.pointSize,
+      memoryBlend: params.memoryBlend,
+      hueShift: palette.hueShift,
+      paletteMix: palette.paletteMix
+    });
+
     post.beginScene();
     engine.renderer.clear(true, true, false);
     engine.renderer.render(engine.scene, engine.camera);
-    post.finish();
+    post.finish({ bloomStrength: params.bloomStrength, exposure: params.exposure });
 
     hud.update();
   }

@@ -107,7 +107,9 @@ export class PostStack {
     this.renderer.clear(true, false, false);
   }
 
-  finish() {
+  finish(params = {}) {
+    if (params.bloomStrength !== undefined) this.toneMat.uniforms.uBloomStrength.value = params.bloomStrength;
+    if (params.exposure !== undefined) this.toneMat.uniforms.uExposure.value = params.exposure;
     this.quad.material = this.highMat;
     this.highMat.uniforms.uSrc.value = this.scene.texture;
     this.renderer.setRenderTarget(this.highpass);
