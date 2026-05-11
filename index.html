@@ -1,33 +1,27 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Playable Universe</title>
+    <link rel="stylesheet" href="/src/ui/styles.css" />
   </head>
   <body>
-    <canvas id="application"></canvas>
-    <div id="void-dust"></div>
-    <div id="intro"></div>
-    <button id="corner-upload" class="corner-button corner-left" type="button">Upload Song</button>
-    <button id="corner-advanced" class="corner-button corner-right" type="button">Advanced</button>
-    <div id="controls-help">
-      <strong>Controls</strong>
-      <span>Piano: A S D F G H J and W E T Y U play notes.</span>
-      <span>Mouse drag orbits, wheel zooms scale, click previews, double click jumps, Backquote opens controls.</span>
+    <canvas id="stage"></canvas>
+
+    <div id="drop-overlay" data-state="idle">
+      <p class="prompt">Drop an MP3 or WAV here, or click to choose a file.</p>
+      <p class="hint">Or press <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd> to play the universe yourself.</p>
+      <input id="file-input" type="file" accept="audio/*" hidden />
     </div>
-    <div id="hud">
-      <strong>Playable Universe</strong>
-      <span id="backend">initializing</span>
-      <span>piano physics, microphone listening, universal musical particles</span>
-    </div>
-    <div id="speed-indicator">UNIVERSE VIEW</div>
-    <div id="board-readout">NOTES none</div>
-    <div id="input-debug"></div>
-    <div id="audio-pulse"></div>
-    <div id="control-rings"></div>
-    <div id="encounter-label"></div>
-    <div id="film-grade"></div>
+
+    <aside id="hud">
+      <span id="hud-scale">outside observer</span>
+      <span id="hud-time">0:00</span>
+    </aside>
+
+    <div id="piano" aria-hidden="true"></div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
