@@ -9,13 +9,18 @@ const VERT = `
   uniform float uPointSize;
   uniform float uMemoryHalfExtent;
   uniform float uPixelRatio;
+  uniform float uHueShift;
+  uniform float uMemoryBlend;
+  uniform float uPaletteMix;
   uniform vec2 uViewport;
   varying vec3 vColor;
   varying float vEnergy;
   varying float vMemory;
-  vec3 familyColor(float f) {
-    float a = (f / 12.0) * 6.2831853;
-    return 0.5 + 0.5 * vec3(cos(a), cos(a + 2.094), cos(a + 4.189));
+  vec3 familyColor(float f, float hueShift, float paletteMix) {
+    float a = (f / 12.0) * 6.2831853 + hueShift;
+    vec3 wheel = 0.5 + 0.5 * vec3(cos(a), cos(a + 2.094), cos(a + 4.189));
+    vec3 mono = vec3(0.55 + 0.45 * cos(a + 1.57));
+    return mix(wheel, mono, paletteMix);
   }
   void main() {
     float i = position.x;
@@ -30,8 +35,8 @@ const VERT = `
     if (muv.x > 0.0 && muv.x < 1.0 && muv.y > 0.0 && muv.y < 1.0) {
       mem = texture2D(uMemory, muv);
     }
-    vec3 base = familyColor(family);
-    vec3 tinted = mix(base, mem.rgb * 1.2, clamp(length(mem.rgb) * 0.6, 0.0, 0.7));
+    vec3 base = familyColor(family, uHueShift, uPaletteMix);
+    vec3 tinted = mix(base, mem.rgb * 1.2, clamp(length(mem.rgb) * uMemoryBlend, 0.0, 0.85));
     vColor = tinted;
     vEnergy = clamp(length(vel.xyz) * 0.05, 0.0, 1.0);
     vMemory = clamp(length(mem.rgb), 0.0, 1.2);
@@ -87,6 +92,9 @@ export class ParticleRenderer {
         uPointSize: { value: 2.4 },
         uMemoryHalfExtent: { value: memoryField.halfExtent },
         uPixelRatio: { value: renderer.getPixelRatio() },
+        uHueShift: { value: 0 },
+        uMemoryBlend: { value: 0.6 },
+        uPaletteMix: { value: 0 },
         uViewport: { value: new THREE.Vector2(1, 1) }
       },
       transparent: true,
@@ -103,11 +111,15 @@ export class ParticleRenderer {
     scene.add(this.points);
   }
 
-  update() {
+  update(params = {}) {
     this.material.uniforms.uPos.value = this.particles.positionTexture;
     this.material.uniforms.uVel.value = this.particles.velocityTexture;
     this.material.uniforms.uMemory.value = this.memoryField.texture;
     this.material.uniforms.uPixelRatio.value = this.renderer.getPixelRatio();
+    if (params.pointSize !== undefined) this.material.uniforms.uPointSize.value = params.pointSize;
+    if (params.memoryBlend !== undefined) this.material.uniforms.uMemoryBlend.value = params.memoryBlend;
+    if (params.hueShift !== undefined) this.material.uniforms.uHueShift.value = params.hueShift;
+    if (params.paletteMix !== undefined) this.material.uniforms.uPaletteMix.value = params.paletteMix;
     const size = new THREE.Vector2();
     this.renderer.getSize(size);
     this.material.uniforms.uViewport.value.set(size.x, size.y);

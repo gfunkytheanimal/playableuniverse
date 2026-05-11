@@ -16,10 +16,14 @@ export class EventMapper {
     this.lastSectionOrigin = [0, 0, 0];
     this.eventCount = 0;
     this.songEnergy = 0;
+    this.audioReactivity = 1;
   }
 
   handle(event, songTime) {
     this.eventCount += 1;
+    if (event.type !== 'impulse') {
+      event = { ...event, strength: Math.min(1, (event.strength ?? 0.5) * this.audioReactivity) };
+    }
     this.songEnergy = Math.min(1, this.songEnergy * 0.99 + event.strength * 0.05);
 
     if (!this.originPlaced) {
@@ -35,9 +39,9 @@ export class EventMapper {
       this.forces.inject({
         kind: 'shell',
         position,
-        strength: 0.4 + event.strength * 0.8,
-        lifetime: 1.4,
-        radius: 30,
+        strength: 0.9 + event.strength * 1.6,
+        lifetime: 1.8,
+        radius: 36,
         color
       });
     } else if (event.type === 'band') {
@@ -46,9 +50,20 @@ export class EventMapper {
         kind,
         position,
         axis: radial.axis,
-        strength: 0.35 + event.strength * 1.1,
-        lifetime: kind === 'well' ? 6 : kind === 'vortex' ? 5 : kind === 'ribbon' ? 7 : 2.2,
-        radius: kind === 'well' ? 40 : 28,
+        strength: 0.8 + event.strength * 1.8,
+        lifetime: kind === 'well' ? 7 : kind === 'vortex' ? 6 : kind === 'ribbon' ? 8 : 2.6,
+        radius: kind === 'well' ? 44 : 30,
+        color
+      });
+    } else if (event.type === 'sustain') {
+      const kind = bandKind(event.band);
+      this.forces.inject({
+        kind,
+        position,
+        axis: radial.axis,
+        strength: 0.45 + event.strength * 0.9,
+        lifetime: kind === 'shell' ? 1.4 : 3.5,
+        radius: kind === 'well' ? 36 : 26,
         color
       });
     } else if (event.type === 'section') {
@@ -57,9 +72,9 @@ export class EventMapper {
         kind: 'vortex',
         position,
         axis: [Math.sin(songTime * 0.1), 0.8, Math.cos(songTime * 0.1)],
-        strength: 1.2 + event.strength * 1.2,
-        lifetime: 9,
-        radius: 80,
+        strength: 1.8 + event.strength * 1.6,
+        lifetime: 11,
+        radius: 90,
         color
       });
     } else if (event.type === 'impulse') {

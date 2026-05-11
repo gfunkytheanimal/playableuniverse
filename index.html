@@ -9,10 +9,22 @@
   <body>
     <canvas id="stage"></canvas>
 
+    <button id="upload-button" class="corner-button" type="button">Upload Song</button>
+    <input id="file-input" type="file" accept="audio/*" hidden />
+
+    <div id="advanced-panel" class="corner-panel" data-collapsed="true">
+      <button class="panel-toggle" type="button" aria-controls="panel-body">Advanced</button>
+      <div id="panel-body" class="panel-body"></div>
+    </div>
+
     <div id="drop-overlay" data-state="idle">
-      <p class="prompt">Drop an MP3 or WAV here, or click to choose a file.</p>
-      <p class="hint">Or press <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd> to play the universe yourself.</p>
-      <input id="file-input" type="file" accept="audio/*" hidden />
+      <p class="prompt">Drop an MP3 or WAV here, or press a key to play.</p>
+      <p class="hint">
+        <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd>
+        bass &middot;
+        <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>
+        sparks
+      </p>
     </div>
 
     <aside id="hud">

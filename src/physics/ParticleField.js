@@ -14,12 +14,13 @@ const INIT_POS_FRAG = `
   precision highp float;
   varying vec2 vUv;
   uniform float uSeed;
+  uniform float uSpawnRadius;
   float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }
   void main() {
     float a = h(vUv * 1.31 + 0.11) * 6.2831853;
     float b = h(vUv * 2.17 + 0.27) * 2.0 - 1.0;
     // Wider flatter disk so the field reads as a cosmic web from any zoom
-    float r = (0.4 + pow(h(vUv * 3.91 + 0.53), 0.5)) * 78.0;
+    float r = (0.4 + pow(h(vUv * 3.91 + 0.53), 0.5)) * uSpawnRadius;
     float s = sqrt(max(0.0, 1.0 - b * b));
     vec3 pos = vec3(cos(a) * s, b * 0.18, sin(a) * s) * r;
     gl_FragColor = vec4(pos, 0.0);
@@ -53,6 +54,9 @@ const VEL_FRAG = `
   uniform float uTime;
   uniform float uMemoryHalfExtent;
   uniform float uSongEnergy;
+  uniform float uForceGain;
+  uniform float uDamping;
+  uniform float uSwirlBias;
   uniform int uForceCount;
   uniform vec4 uForcePos[${MAX_SOURCES}];
   uniform vec4 uForceMeta[${MAX_SOURCES}];
@@ -72,7 +76,7 @@ const VEL_FRAG = `
       float kind = uForcePos[i].w;
       if (kind < -0.5) continue;
       vec3 axis = normalize(uForceMeta[i].xyz + vec3(0.0, 1e-4, 0.0));
-      float strength = uForceMeta[i].w;
+      float strength = uForceMeta[i].w * uForceGain;
       vec3 d = sp - p;
       float r = length(d) + 0.6;
       vec3 dir = d / r;
@@ -84,11 +88,11 @@ const VEL_FRAG = `
         float pull = strength * 7.0 / (r * 0.35 + 4.0);
         accel += dir * pull;
         vec3 tang = normalize(cross(axis, dir) + 1e-4);
-        accel += tang * strength * 11.0 / (r * 0.2 + 3.0);
+        accel += tang * strength * (8.0 + uSwirlBias * 6.0) / (r * 0.2 + 3.0);
       } else if (kind < 1.5) {
         // vortex: dominant tangential, weak radial
         vec3 tang = normalize(cross(axis, dir) + 1e-4);
-        accel += tang * strength * 16.0 / (r * 0.25 + 1.2);
+        accel += tang * strength * (12.0 + uSwirlBias * 8.0) / (r * 0.25 + 1.2);
         accel += dir * strength * 0.6 / (r + 4.0);
       } else if (kind < 2.5) {
         // shell: outward pulse
@@ -127,8 +131,8 @@ const VEL_FRAG = `
 
     // integrate
     v += accel * uDt;
-    // damping (gentler so orbits persist)
-    v *= pow(0.993, uDt * 60.0);
+    // damping (gentler so orbits persist) — user-tunable
+    v *= pow(clamp(uDamping, 0.85, 0.9999), uDt * 60.0);
     // soft confinement
     float radius = length(p);
     float bound = 260.0;
@@ -188,7 +192,7 @@ export class ParticleField {
     this.initPosMat = new THREE.ShaderMaterial({
       vertexShader: FULL_QUAD_VERT,
       fragmentShader: INIT_POS_FRAG,
-      uniforms: { uSeed: { value: seed } }
+      uniforms: { uSeed: { value: seed }, uSpawnRadius: { value: 78 } }
     });
     this.initVelMat = new THREE.ShaderMaterial({
       vertexShader: FULL_QUAD_VERT,
@@ -210,6 +214,9 @@ export class ParticleField {
         uTime: { value: 0 },
         uMemoryHalfExtent: { value: MEMORY_HALF_EXTENT },
         uSongEnergy: { value: 0 },
+        uForceGain: { value: 1 },
+        uDamping: { value: 0.993 },
+        uSwirlBias: { value: 1 },
         uForceCount: { value: 0 },
         uForcePos: { value: this.forcePos },
         uForceMeta: { value: this.forceMeta }
@@ -228,9 +235,10 @@ export class ParticleField {
     this.reset(seed);
   }
 
-  reset(seed = this.seed) {
+  reset(seed = this.seed, spawnRadius = 78) {
     this.seed = seed;
     this.initPosMat.uniforms.uSeed.value = seed;
+    this.initPosMat.uniforms.uSpawnRadius.value = spawnRadius;
     this.initVelMat.uniforms.uSeed.value = seed + 7;
 
     this.quad.material = this.initPosMat;
@@ -245,16 +253,20 @@ export class ParticleField {
     this.renderer.setRenderTarget(null);
   }
 
-  step(dt, forces, memory, songEnergy = 0, songTime = 0) {
+  step(dt, forces, memory, songEnergy = 0, songTime = 0, opts = {}) {
     const count = forces.serialize(this.forcePos, this.forceMeta);
+    const scaledDt = dt * (opts.timeScale ?? 1);
 
     this.quad.material = this.velMat;
     this.velMat.uniforms.uPos.value = this.posA.texture;
     this.velMat.uniforms.uVel.value = this.velA.texture;
     this.velMat.uniforms.uMemory.value = memory.texture;
-    this.velMat.uniforms.uDt.value = dt;
+    this.velMat.uniforms.uDt.value = scaledDt;
     this.velMat.uniforms.uTime.value = songTime;
     this.velMat.uniforms.uSongEnergy.value = songEnergy;
+    this.velMat.uniforms.uForceGain.value = opts.forceGain ?? 1;
+    this.velMat.uniforms.uDamping.value = opts.damping ?? 0.993;
+    this.velMat.uniforms.uSwirlBias.value = opts.swirlBias ?? 1;
     this.velMat.uniforms.uForceCount.value = count;
     this.velMat.uniforms.uForcePos.value = this.forcePos;
     this.velMat.uniforms.uForceMeta.value = this.forceMeta;
@@ -264,7 +276,7 @@ export class ParticleField {
     this.quad.material = this.posMat;
     this.posMat.uniforms.uPos.value = this.posA.texture;
     this.posMat.uniforms.uVel.value = this.velB.texture;
-    this.posMat.uniforms.uDt.value = dt;
+    this.posMat.uniforms.uDt.value = scaledDt;
     this.renderer.setRenderTarget(this.posB);
     this.renderer.render(this.scene, this.camera);
 

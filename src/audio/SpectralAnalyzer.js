@@ -16,11 +16,13 @@ export class SpectralAnalyzer {
     this.prevMag = new Float32Array(1024);
     this.diffs = new Float32Array(1024);
     this.flux = 0;
+    this.fluxAvg = 0;
     this.bands = Object.fromEntries(BAND_NAMES.map((n) => [n, 0]));
     this.bandFlux = Object.fromEntries(BAND_NAMES.map((n) => [n, 0]));
+    this.bandFluxAvg = Object.fromEntries(BAND_NAMES.map((n) => [n, 0]));
+    this.bandLevelAvg = Object.fromEntries(BAND_NAMES.map((n) => [n, 0]));
     this.centroid = 0;
     this.rms = 0;
-    this.noiseFloor = 0.02;
     this.harmonicity = 0;
   }
 
@@ -76,11 +78,9 @@ export class SpectralAnalyzer {
       const w = Math.max(1, b - a);
       this.bands[name] = sum / w;
       this.bandFlux[name] = flx / w;
+      this.bandFluxAvg[name] = this.bandFluxAvg[name] * 0.92 + this.bandFlux[name] * 0.08;
+      this.bandLevelAvg[name] = this.bandLevelAvg[name] * 0.93 + this.bands[name] * 0.07;
     }
-
-    const target = this.rms;
-    const rise = 0.0008;
-    const fall = 0.06;
-    this.noiseFloor += (target > this.noiseFloor ? rise : fall) * (target - this.noiseFloor);
+    this.fluxAvg = this.fluxAvg * 0.92 + this.flux * 0.08;
   }
 }
