@@ -63,14 +63,24 @@ export class EventMapper {
         color
       });
     } else if (event.type === 'impulse') {
+      const kind = event.kind ?? 'shell';
+      const lifetime = event.lifetime ?? (kind === 'well' ? 5 : kind === 'vortex' ? 4 : 1.6);
       this.forces.inject({
-        kind: event.kind ?? 'shell',
+        kind,
         position: event.position ?? position,
-        strength: 0.6 + (event.strength ?? 0.5) * 1.2,
-        lifetime: event.lifetime ?? 1.2,
-        radius: 24,
+        axis: event.axis ?? [Math.cos((event.pitch ?? 0) * 0.5), 0.7, Math.sin((event.pitch ?? 0) * 0.5)],
+        strength: 1.1 + (event.strength ?? 0.5) * 1.6,
+        lifetime,
+        radius: 36,
         color: event.color ?? color
       });
+      this.memory.stamp({
+        position: event.position ?? position,
+        radius: 0.05 + (event.strength ?? 0.5) * 0.05,
+        intensity: 0.4 + (event.strength ?? 0.5) * 0.5,
+        color: event.color ?? color
+      });
+      return;
     }
 
     this.memory.stamp({
@@ -83,12 +93,24 @@ export class EventMapper {
 
   _placeOrigin(event) {
     const color = BAND_COLORS[event.band] ?? BAND_COLORS.broadband;
+    // Seed singularity: short-lived and balanced by tangential swirl in the well shader
     this.forces.inject({
       kind: 'well',
       position: [0, 0, 0],
-      strength: 1.6,
-      lifetime: 60,
+      axis: [0, 1, 0],
+      strength: 0.7,
+      lifetime: 9,
       radius: 60,
+      color
+    });
+    // Companion vortex so the seed grows as a rotating disk, not a pile
+    this.forces.inject({
+      kind: 'vortex',
+      position: [0, 0, 0],
+      axis: [0, 1, 0],
+      strength: 0.9,
+      lifetime: 14,
+      radius: 80,
       color
     });
     this.memory.stamp({ position: [0, 0, 0], radius: 0.12, intensity: 1.2, color });

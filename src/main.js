@@ -45,7 +45,8 @@ audio.onSongStart = (duration, seed) => {
   memory.clear();
   mapper.originPlaced = false;
   mapper.eventCount = 0;
-  scaleCamera.setTargetZoom(0.42);
+  scaleCamera.zoom = 0.18;
+  scaleCamera.targetZoom = 0.42;
 };
 
 const analyzer = new SpectralAnalyzer(audio);
