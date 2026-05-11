@@ -18,9 +18,10 @@ const INIT_POS_FRAG = `
   void main() {
     float a = h(vUv * 1.31 + 0.11) * 6.2831853;
     float b = h(vUv * 2.17 + 0.27) * 2.0 - 1.0;
-    float r = pow(h(vUv * 3.91 + 0.53), 0.3333) * 18.0;
+    // Wider flatter disk so the field reads as a cosmic web from any zoom
+    float r = (0.4 + pow(h(vUv * 3.91 + 0.53), 0.5)) * 78.0;
     float s = sqrt(max(0.0, 1.0 - b * b));
-    vec3 pos = vec3(cos(a) * s, b * 0.42, sin(a) * s) * r;
+    vec3 pos = vec3(cos(a) * s, b * 0.18, sin(a) * s) * r;
     gl_FragColor = vec4(pos, 0.0);
   }
 `;
@@ -29,13 +30,16 @@ const INIT_VEL_FRAG = `
   precision highp float;
   varying vec2 vUv;
   uniform float uSeed;
+  uniform sampler2D uPos;
   float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed) * 43758.5453); }
   void main() {
     float family = floor(h(vUv * 7.11) * 12.0);
-    float ax = (h(vUv * 13.9) - 0.5) * 0.4;
-    float ay = (h(vUv * 19.3) - 0.5) * 0.18;
-    float az = (h(vUv * 23.7) - 0.5) * 0.4;
-    gl_FragColor = vec4(ax, ay, az, family);
+    vec3 p = texture2D(uPos, vUv).xyz;
+    // Tangential seed: cross with up gives orbital motion around the origin
+    vec3 tang = normalize(cross(vec3(0.0, 1.0, 0.0), p) + 1e-4);
+    float speed = 2.4 + h(vUv * 9.1) * 1.8;
+    vec3 jitter = vec3(h(vUv * 13.9) - 0.5, (h(vUv * 19.3) - 0.5) * 0.6, h(vUv * 23.7) - 0.5) * 0.7;
+    gl_FragColor = vec4(tang * speed + jitter, family);
   }
 `;
 
@@ -72,25 +76,31 @@ const VEL_FRAG = `
       vec3 d = sp - p;
       float r = length(d) + 0.6;
       vec3 dir = d / r;
+      // shared core repulsion to stop point-collapse
+      float coreRepel = exp(-r * 0.25) * 8.0;
+      accel += -dir * coreRepel;
       if (kind < 0.5) {
-        // well: attraction with 1/r falloff, mild capture floor
-        accel += dir * strength * 14.0 / (r * 0.5 + 1.5);
-      } else if (kind < 1.5) {
-        // vortex: tangential swirl + weak radial
+        // well: bounded attraction + strong tangential swirl so things orbit, not collapse
+        float pull = strength * 7.0 / (r * 0.35 + 4.0);
+        accel += dir * pull;
         vec3 tang = normalize(cross(axis, dir) + 1e-4);
-        accel += tang * strength * 9.0 / (r * 0.25 + 1.2);
-        accel += dir * strength * 1.5 / (r + 4.0);
+        accel += tang * strength * 11.0 / (r * 0.2 + 3.0);
+      } else if (kind < 1.5) {
+        // vortex: dominant tangential, weak radial
+        vec3 tang = normalize(cross(axis, dir) + 1e-4);
+        accel += tang * strength * 16.0 / (r * 0.25 + 1.2);
+        accel += dir * strength * 0.6 / (r + 4.0);
       } else if (kind < 2.5) {
-        // shell: radial pulse outward, range-limited
+        // shell: outward pulse
         float falloff = exp(-r * 0.045);
-        accel += -dir * strength * 36.0 * falloff;
+        accel += -dir * strength * 48.0 * falloff;
       } else {
-        // ribbon: pull toward an axis line through sp
+        // ribbon: pull toward an axis line through sp + flow along axis
         vec3 along = dot(d, axis) * axis;
         vec3 perp = d - along;
         float pr = length(perp) + 0.5;
-        accel += perp / pr * strength * 6.0 / (pr * 0.3 + 1.0);
-        accel += axis * strength * 1.2;
+        accel += perp / pr * strength * 8.0 / (pr * 0.3 + 1.0);
+        accel += axis * strength * 2.4;
       }
     }
 
@@ -111,10 +121,14 @@ const VEL_FRAG = `
     float fa = (family / 12.0) * 6.2831853;
     accel += vec3(cos(fa + uTime * 0.05), 0.0, sin(fa + uTime * 0.05)) * 0.04 * (0.4 + uSongEnergy);
 
+    // accel clamp to prevent blow-ups when near a force center
+    float amag = length(accel);
+    if (amag > 220.0) accel *= 220.0 / amag;
+
     // integrate
     v += accel * uDt;
-    // damping
-    v *= pow(0.985, uDt * 60.0);
+    // damping (gentler so orbits persist)
+    v *= pow(0.993, uDt * 60.0);
     // soft confinement
     float radius = length(p);
     float bound = 260.0;
@@ -122,7 +136,7 @@ const VEL_FRAG = `
 
     // velocity clamp
     float vmag = length(v);
-    if (vmag > 60.0) v *= 60.0 / vmag;
+    if (vmag > 80.0) v *= 80.0 / vmag;
 
     gl_FragColor = vec4(v, family);
   }
@@ -179,7 +193,7 @@ export class ParticleField {
     this.initVelMat = new THREE.ShaderMaterial({
       vertexShader: FULL_QUAD_VERT,
       fragmentShader: INIT_VEL_FRAG,
-      uniforms: { uSeed: { value: seed + 7 } }
+      uniforms: { uSeed: { value: seed + 7 }, uPos: { value: null } }
     });
 
     this.forcePos = new Float32Array(MAX_SOURCES * 4);
@@ -223,6 +237,7 @@ export class ParticleField {
     this.renderer.setRenderTarget(this.posA);
     this.renderer.render(this.scene, this.camera);
 
+    this.initVelMat.uniforms.uPos.value = this.posA.texture;
     this.quad.material = this.initVelMat;
     this.renderer.setRenderTarget(this.velA);
     this.renderer.render(this.scene, this.camera);
