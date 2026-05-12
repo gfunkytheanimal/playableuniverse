@@ -16,11 +16,16 @@ const VERT = `
   varying vec3 vColor;
   varying float vEnergy;
   varying float vMemory;
+  varying float vWarmth;
+  varying float vClass;
   vec3 familyColor(float f, float hueShift, float paletteMix) {
     float a = (f / 12.0) * 6.2831853 + hueShift;
     vec3 wheel = 0.5 + 0.5 * vec3(cos(a), cos(a + 2.094), cos(a + 4.189));
     vec3 mono = vec3(0.55 + 0.45 * cos(a + 1.57));
     return mix(wheel, mono, paletteMix);
+  }
+  float hash11(float x) {
+    return fract(sin(x * 12.9898) * 43758.5453);
   }
   void main() {
     float i = position.x;
@@ -35,15 +40,45 @@ const VERT = `
     if (muv.x > 0.0 && muv.x < 1.0 && muv.y > 0.0 && muv.y < 1.0) {
       mem = texture2D(uMemory, muv);
     }
+    // Stellar class — stable per particle. Most are dust; a small fraction
+    // are giants and supergiants that read as actual stars.
+    float roll = hash11(i * 0.0173 + 7.31);
+    float classSize;
+    float classWarmth;
+    float classEmit;
+    if (roll < 0.004) {           // 0.4% supergiants
+      classSize = 5.5;
+      classWarmth = 0.85;
+      classEmit = 1.8;
+      vClass = 3.0;
+    } else if (roll < 0.024) {    // 2% giants
+      classSize = 2.6;
+      classWarmth = 0.55;
+      classEmit = 1.25;
+      vClass = 2.0;
+    } else if (roll < 0.12) {     // 9.6% main-sequence stars
+      classSize = 1.4;
+      classWarmth = 0.25;
+      classEmit = 0.95;
+      vClass = 1.0;
+    } else {                      // 88% dust
+      classSize = 0.78 + hash11(i * 0.041) * 0.42;
+      classWarmth = 0.0;
+      classEmit = 0.6;
+      vClass = 0.0;
+    }
     vec3 base = familyColor(family, uHueShift, uPaletteMix);
-    vec3 tinted = mix(base, mem.rgb * 1.2, clamp(length(mem.rgb) * uMemoryBlend, 0.0, 0.85));
-    vColor = tinted;
+    vec3 warmTint = vec3(1.55, 1.25, 0.82);
+    vec3 stellar = mix(base, warmTint, classWarmth);
+    vec3 tinted = mix(stellar, mem.rgb * 1.2, clamp(length(mem.rgb) * uMemoryBlend, 0.0, 0.85));
+    vColor = tinted * classEmit;
+    vWarmth = classWarmth;
     vEnergy = clamp(length(vel.xyz) * 0.05, 0.0, 1.0);
     vMemory = clamp(length(mem.rgb), 0.0, 1.2);
     vec4 mv = modelViewMatrix * vec4(world, 1.0);
     gl_Position = projectionMatrix * mv;
     float dist = max(0.1, -mv.z);
-    gl_PointSize = uPointSize * uPixelRatio * (160.0 / dist);
+    gl_PointSize = uPointSize * uPixelRatio * (160.0 / dist) * classSize;
   }
 `;
 
@@ -52,19 +87,24 @@ const FRAG = `
   varying vec3 vColor;
   varying float vEnergy;
   varying float vMemory;
+  varying float vWarmth;
+  varying float vClass;
   void main() {
     vec2 d = gl_PointCoord - 0.5;
     float r2 = dot(d, d);
     if (r2 > 0.25) discard;
-    float core = exp(-r2 * 22.0);
-    float halo = exp(-r2 * 7.0) * 0.22;
+    // Brighter stars get a tighter core + a longer halo so they read as
+    // luminous objects instead of just larger dots.
+    float coreSharpness = mix(22.0, 38.0, smoothstep(0.0, 3.0, vClass));
+    float haloScale = mix(0.22, 0.55, smoothstep(0.5, 3.0, vClass));
+    float core = exp(-r2 * coreSharpness);
+    float halo = exp(-r2 * 6.0) * haloScale;
     float glow = core + halo;
     vec3 base = vColor;
-    vec3 hot = mix(base, vec3(1.0), vEnergy * 0.55);
+    vec3 hot = mix(base, vec3(1.0), vEnergy * 0.55 + vWarmth * 0.3);
     vec3 lit = hot * (0.55 + vMemory * 0.7) + base * vMemory * 0.28;
-    // Slightly lower base alpha so dense clusters don't saturate to a white
-    // blob and sparse regions retain visible texture.
-    gl_FragColor = vec4(lit, glow * (0.38 + vEnergy * 0.5 + vMemory * 0.28));
+    float alphaBase = mix(0.38, 0.55, smoothstep(0.0, 3.0, vClass));
+    gl_FragColor = vec4(lit, glow * (alphaBase + vEnergy * 0.5 + vMemory * 0.28));
   }
 `;
 

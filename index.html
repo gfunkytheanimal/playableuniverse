@@ -10,12 +10,10 @@
     <canvas id="stage"></canvas>
 
     <div id="upload-stack" class="corner-stack">
-      <button id="upload-button" class="corner-button" type="button">Upload Song</button>
       <button id="structure-button" class="corner-button" type="button">Add Structure</button>
       <button id="reset-button" class="corner-button" type="button">Reset Universe</button>
       <button id="recenter-button" class="corner-button" type="button">Recenter Camera</button>
     </div>
-    <input id="file-input" type="file" accept="audio/*" hidden />
     <input id="structure-input" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
 
     <div id="advanced-panel" class="corner-panel" data-collapsed="true">
@@ -24,10 +22,10 @@
     </div>
 
     <div id="drop-overlay" data-state="idle">
-      <p class="prompt">Drop an MP3 or WAV here, or press a key to play.</p>
+      <p class="prompt">Play the universe.</p>
       <p class="hint">
         <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd>
-        bass &middot;
+        anchors &middot;
         <kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>
         sparks &middot;
         <kbd>Space</kbd> drum

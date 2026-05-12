@@ -19,14 +19,14 @@ export class AdvancedPanel {
       ['Damping', 'damping', 0.9, 0.9999, 0.0005],
       ['Swirl bias', 'swirlBias', 0.0, 3.0, 0.05],
       ['Expansion', 'expansion', 0.0, 2.5, 0.05],
+      ['Self-gravity', 'cluster', 0.0, 2.5, 0.05],
       ['Time scale', 'timeScale', 0.1, 3.0, 0.05],
       ['Origin strength', 'originStrength', 0.0, 2.0, 0.05]
     ]);
     this._section('Cosmology', [
-      ['Audio reactivity', 'audioReactivity', 0.2, 4.0, 0.05],
       ['Memory persistence', 'memoryDecay', 0.985, 1.0, 0.0005],
       ['Memory blend', 'memoryBlend', 0.0, 2.0, 0.05],
-      ['Spawn radius', 'spawnRadius', 20, 260, 2]
+      ['Spawn radius', 'spawnRadius', 20, 320, 2]
     ]);
     this._section('Visuals', [
       ['Point size', 'pointSize', 0.4, 8.0, 0.1],

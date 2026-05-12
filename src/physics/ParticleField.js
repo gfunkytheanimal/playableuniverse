@@ -56,6 +56,7 @@ const VEL_FRAG = `
   uniform sampler2D uPos;
   uniform sampler2D uVel;
   uniform sampler2D uMemory;
+  uniform sampler2D uDensity;
   uniform float uDt;
   uniform float uTime;
   uniform float uMemoryHalfExtent;
@@ -64,6 +65,7 @@ const VEL_FRAG = `
   uniform float uDamping;
   uniform float uSwirlBias;
   uniform float uExpansion;
+  uniform float uCluster;
   uniform int uForceCount;
   uniform vec4 uForcePos[${MAX_SOURCES}];
   uniform vec4 uForceMeta[${MAX_SOURCES}];
@@ -144,6 +146,28 @@ const VEL_FRAG = `
     float pr = length(p) + 1.0;
     float expansionFalloff = exp(-pr / 240.0);
     accel += (p / pr) * uExpansion * (0.6 + uSongEnergy * 4.5) * expansionFalloff;
+
+    // Self-gravity via density field: sample the 2D self-density map and pull
+    // particles up the gradient. This is what lets the field self-organise
+    // into clumps (stars, planets, galaxies) without an n-body computation.
+    // Strength is bounded by local density so empty space doesn't accelerate
+    // and dense cores don't crash to a point (the closer you are to the
+    // gradient direction, the harder the inward pull resists at small radii).
+    vec2 duv = (p.xz / uMemoryHalfExtent) * 0.5 + 0.5;
+    if (uCluster > 0.001 && duv.x > 0.03 && duv.x < 0.97 && duv.y > 0.03 && duv.y < 0.97) {
+      float d0 = texture2D(uDensity, duv).r;
+      float dxp = texture2D(uDensity, duv + vec2(0.012, 0.0)).r;
+      float dxn = texture2D(uDensity, duv - vec2(0.012, 0.0)).r;
+      float dzp = texture2D(uDensity, duv + vec2(0.0, 0.012)).r;
+      float dzn = texture2D(uDensity, duv - vec2(0.0, 0.012)).r;
+      vec3 grad = vec3(dxp - dxn, 0.0, dzp - dzn);
+      float gMag = length(grad) + 0.001;
+      // Pull toward higher density, with a tanh-style saturation so cores
+      // hold together but don't accelerate to infinity. Local density d0
+      // scales the strength so deep voids don't drift forever.
+      float pull = uCluster * (d0 / (d0 + 0.06)) * 32.0;
+      accel += (grad / gMag) * pull * tanh(gMag * 90.0);
+    }
 
     // accel clamp to prevent blow-ups when near a force center
     float amag = length(accel);
@@ -231,6 +255,7 @@ export class ParticleField {
         uPos: { value: null },
         uVel: { value: null },
         uMemory: { value: null },
+        uDensity: { value: null },
         uDt: { value: 1 / 60 },
         uTime: { value: 0 },
         uMemoryHalfExtent: { value: MEMORY_HALF_EXTENT },
@@ -239,6 +264,7 @@ export class ParticleField {
         uDamping: { value: 0.997 },
         uSwirlBias: { value: 1 },
         uExpansion: { value: 0.4 },
+        uCluster: { value: 0.8 },
         uForceCount: { value: 0 },
         uForcePos: { value: this.forcePos },
         uForceMeta: { value: this.forceMeta }
@@ -275,7 +301,7 @@ export class ParticleField {
     this.renderer.setRenderTarget(null);
   }
 
-  step(dt, forces, memory, songEnergy = 0, songTime = 0, opts = {}) {
+  step(dt, forces, memory, density, songEnergy = 0, songTime = 0, opts = {}) {
     const count = forces.serialize(this.forcePos, this.forceMeta);
     const scaledDt = dt * (opts.timeScale ?? 1);
 
@@ -283,6 +309,7 @@ export class ParticleField {
     this.velMat.uniforms.uPos.value = this.posA.texture;
     this.velMat.uniforms.uVel.value = this.velA.texture;
     this.velMat.uniforms.uMemory.value = memory.texture;
+    this.velMat.uniforms.uDensity.value = density?.texture ?? null;
     this.velMat.uniforms.uDt.value = scaledDt;
     this.velMat.uniforms.uTime.value = songTime;
     this.velMat.uniforms.uSongEnergy.value = songEnergy;
@@ -290,6 +317,7 @@ export class ParticleField {
     this.velMat.uniforms.uDamping.value = opts.damping ?? 0.997;
     this.velMat.uniforms.uSwirlBias.value = opts.swirlBias ?? 1;
     this.velMat.uniforms.uExpansion.value = opts.expansion ?? 0.4;
+    this.velMat.uniforms.uCluster.value = density ? (opts.cluster ?? 0.8) : 0;
     this.velMat.uniforms.uForceCount.value = count;
     this.velMat.uniforms.uForcePos.value = this.forcePos;
     this.velMat.uniforms.uForceMeta.value = this.forceMeta;

@@ -1,46 +1,42 @@
+import * as THREE from 'three';
 import { Engine } from './engine/Engine.js';
 import { Loop } from './engine/Loop.js';
 import { Clock } from './engine/Clock.js';
 import { EventBus } from './audio/EventBus.js';
-import { AudioInput } from './audio/AudioInput.js';
-import { SpectralAnalyzer } from './audio/SpectralAnalyzer.js';
-import { OnsetDetector } from './audio/OnsetDetector.js';
-import { Sectioner } from './audio/Sectioner.js';
 import { EventMapper } from './cosmology/EventMapper.js';
 import { ForceSources } from './physics/ForceSources.js';
 import { MemoryField } from './physics/MemoryField.js';
 import { ParticleField } from './physics/ParticleField.js';
+import { DensityField } from './physics/DensityField.js';
 import { ParticleRenderer } from './rendering/ParticleRenderer.js';
 import { PostStack } from './rendering/PostStack.js';
-import * as THREE from 'three';
+import { Starfield } from './rendering/Starfield.js';
 import { ScaleCamera } from './camera/ScaleCamera.js';
 import { setupInput } from './camera/Input.js';
 import { Piano } from './interaction/Piano.js';
 import { Synth } from './interaction/Synth.js';
-import { DropZone } from './ui/DropZone.js';
 import { HUD } from './ui/HUD.js';
 import { AdvancedPanel } from './ui/AdvancedPanel.js';
 import { StructureLoader } from './scene/StructureLoader.js';
-import { Starfield } from './rendering/Starfield.js';
 
 const canvas = document.getElementById('stage');
 canvas.style.width = '100%';
 canvas.style.height = '100%';
 
 const params = {
-  forceGain: 0.7,
+  forceGain: 0.85,
   damping: 0.996,
   swirlBias: 1.0,
   timeScale: 1,
-  expansion: 1.4,
+  expansion: 1.2,
+  cluster: 0.85,
   originStrength: 0.28,
-  pointSize: 1.6,
-  bloomStrength: 0.75,
+  pointSize: 1.7,
+  bloomStrength: 0.85,
   exposure: 1.0,
-  memoryBlend: 0.65,
-  audioReactivity: 1.0,
+  memoryBlend: 0.55,
   memoryDecay: 0.9998,
-  spawnRadius: 180,
+  spawnRadius: 200,
   palette: 'spectral',
   synthVolume: 0.32,
   synthWaveform: 'triangle',
@@ -62,7 +58,8 @@ const bus = new EventBus();
 
 const forces = new ForceSources();
 const memory = new MemoryField(engine.renderer);
-const particles = new ParticleField(engine.renderer, { count: 65536 });
+const particles = new ParticleField(engine.renderer, { count: 262144 });
+const density = new DensityField(engine.renderer, particles);
 const renderer = new ParticleRenderer(engine.renderer, particles, memory);
 renderer.attachTo(engine.scene);
 const post = new PostStack(engine.renderer);
@@ -70,8 +67,8 @@ const scaleCamera = new ScaleCamera(engine.camera);
 const structures = new StructureLoader(engine.scene);
 const starfield = new Starfield(engine.renderer, engine.scene);
 
-// Camera focus = weighted centroid of active force sources (where the song is
-// currently doing work). Falls back to origin when nothing is happening.
+// Camera focus = weighted centroid of active force sources (where the player
+// is currently doing work). Falls back to origin when nothing is happening.
 const focusVec = new THREE.Vector3();
 scaleCamera.setFocusProvider(() => {
   let cx = 0, cy = 0, cz = 0, sum = 0;
@@ -87,46 +84,49 @@ scaleCamera.setFocusProvider(() => {
 });
 
 const mapper = new EventMapper({ forces, memory });
-bus.on('event', (e) => mapper.handle(e, clock.songTime));
+bus.on('event', (e) => mapper.handle(e, clock.now));
 
 const synth = new Synth();
 synth.setVolume(params.synthVolume);
 synth.setWaveform(params.synthWaveform);
 synth.setCutoff(params.synthCutoff);
 
-const audio = new AudioInput();
-const dropZone = new DropZone({
-  overlay: document.getElementById('drop-overlay'),
-  button: document.getElementById('upload-button'),
-  input: document.getElementById('file-input'),
-  structureButton: document.getElementById('structure-button'),
-  structureInput: document.getElementById('structure-input')
-}, {
-  onAudio: (file) => audio.loadFile(file),
-  onStructure: (file) => structures.loadFile(file).catch((err) => console.warn('Structure load failed:', err))
-});
-
-audio.onSongStart = (duration, seed) => {
-  clock.startSong(duration);
-  particles.reset(seed, params.spawnRadius);
-  forces.list.length = 0;
-  memory.clear();
-  mapper.originPlaced = false;
-  mapper.eventCount = 0;
-  scaleCamera.zoom = 0.2;
-  scaleCamera.targetZoom = 0.42;
-  dropZone.dismissOverlay();
-};
-
-const analyzer = new SpectralAnalyzer(audio);
-const onsets = new OnsetDetector(analyzer);
-const sectioner = new Sectioner(analyzer);
-onsets.attach(bus);
-sectioner.attach(bus);
+let firstInteraction = true;
+const dropOverlay = document.getElementById('drop-overlay');
+function dismissOverlay() {
+  if (!firstInteraction) return;
+  firstInteraction = false;
+  dropOverlay?.classList.add('dismissed');
+}
 
 const piano = new Piano(bus, document.getElementById('piano'), {
   synth,
-  onTrigger: () => dropZone.dismissOverlay()
+  onTrigger: dismissOverlay
+});
+
+// Structure loader: click button or drag .glb onto the page.
+const structureInput = document.getElementById('structure-input');
+document.getElementById('structure-button')?.addEventListener('click', () => structureInput?.click());
+structureInput?.addEventListener('change', () => {
+  const file = structureInput.files?.[0];
+  if (!file) return;
+  dismissOverlay();
+  structures.loadFile(file).catch((err) => console.warn('Structure load failed:', err));
+});
+window.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  if (dropOverlay) dropOverlay.dataset.state = 'hover';
+});
+window.addEventListener('dragleave', () => {
+  if (dropOverlay) dropOverlay.dataset.state = 'idle';
+});
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (dropOverlay) dropOverlay.dataset.state = 'idle';
+  const file = [...(e.dataTransfer?.files ?? [])].find((f) => /\.(glb|gltf)$/i.test(f.name));
+  if (!file) return;
+  dismissOverlay();
+  structures.loadFile(file).catch((err) => console.warn('Structure load failed:', err));
 });
 
 const hud = new HUD({
@@ -142,7 +142,7 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
   },
   onAction: (action) => {
     if (action === 'reset') {
-      const seed = audio.fingerprintSeed || Math.floor(Math.random() * 1e6);
+      const seed = Math.floor(Math.random() * 1e6);
       particles.reset(seed, params.spawnRadius);
       forces.list.length = 0;
       memory.clear();
@@ -159,14 +159,13 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
 });
 
 document.getElementById('reset-button')?.addEventListener('click', () => {
-  const seed = audio.fingerprintSeed || Math.floor(Math.random() * 1e6);
+  const seed = Math.floor(Math.random() * 1e6);
   particles.reset(seed, params.spawnRadius);
   forces.list.length = 0;
   memory.clear();
   mapper.originPlaced = false;
   mapper.eventCount = 0;
 });
-
 document.getElementById('recenter-button')?.addEventListener('click', () => {
   scaleCamera.recenter();
 });
@@ -179,46 +178,38 @@ window.addEventListener('resize', () => {
 
 const loop = new Loop({
   step: (dt) => {
-    const playing = audio.isPlaying();
-    clock.advance(dt, playing);
-    analyzer.update();
-    onsets.update(clock.songTime);
-    sectioner.update(clock.songTime);
-
-    mapper.audioReactivity = params.audioReactivity;
+    clock.advance(dt, false);
     mapper.originStrength = params.originStrength;
 
     forces.update(dt);
     memory.decay(dt, params.memoryDecay);
     mapper.tick(dt);
 
-    const songEnergy = analyzer.rms;
-    particles.step(dt, forces, memory, songEnergy, clock.songTime, {
+    density.update();
+
+    particles.step(dt, forces, memory, density, 0, clock.now, {
       forceGain: params.forceGain,
       damping: params.damping,
       swirlBias: params.swirlBias,
       timeScale: params.timeScale,
-      expansion: params.expansion
+      expansion: params.expansion,
+      cluster: params.cluster
     });
     scaleCamera.update(dt, particles);
     starfield.update(clock.now);
 
     const palette = PALETTES[params.palette] ?? PALETTES.spectral;
-    const audioPulse = Math.min(1.0, analyzer.rms * params.audioReactivity * 1.6 + analyzer.flux * 10);
     renderer.update({
-      pointSize: params.pointSize * (1 + audioPulse * 0.22),
+      pointSize: params.pointSize,
       memoryBlend: params.memoryBlend,
-      hueShift: palette.hueShift + analyzer.centroid * 0.6,
+      hueShift: palette.hueShift,
       paletteMix: palette.paletteMix
     });
 
     post.beginScene();
     engine.renderer.clear(true, true, false);
     engine.renderer.render(engine.scene, engine.camera);
-    post.finish({
-      bloomStrength: params.bloomStrength * (1 + audioPulse * 0.18),
-      exposure: params.exposure * (1 + audioPulse * 0.08)
-    });
+    post.finish({ bloomStrength: params.bloomStrength, exposure: params.exposure });
 
     hud.update();
   }
