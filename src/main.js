@@ -19,6 +19,7 @@ import { Piano } from './interaction/Piano.js';
 import { Synth } from './interaction/Synth.js';
 import { HUD } from './ui/HUD.js';
 import { AdvancedPanel } from './ui/AdvancedPanel.js';
+import { DebugOverlay } from './ui/DebugOverlay.js';
 import { StructureLoader } from './scene/StructureLoader.js';
 
 const canvas = document.getElementById('stage');
@@ -171,6 +172,10 @@ const hud = new HUD({
   fpsEl: document.getElementById('hud-fps')
 }, clock, scaleCamera);
 
+const debug = new DebugOverlay(document.getElementById('debug-overlay'), {
+  engine, particles, forces, encounterObjects, scaleCamera, post, density, memory
+});
+
 const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), params, {
   onParam: (key, value) => {
     if (key === 'synthVolume') synth.setVolume(value);
@@ -309,6 +314,8 @@ const loop = new Loop({
 
     hud.tick(dt);
     hud.update();
+    debug.tick(dt);
+    debug.update();
   }
 });
 
