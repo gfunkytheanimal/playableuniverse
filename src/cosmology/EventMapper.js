@@ -83,11 +83,14 @@ export class EventMapper {
       const kind = event.kind ?? 'shell';
       const lifetime = event.lifetime ?? (kind === 'well' ? 3 : kind === 'vortex' ? 2.5 : 1);
       const pitch = event.pitch ?? 0;
+      // Capped strength: even max-velocity piano hits and encounter impulses
+      // cannot exceed the bounds that produced the supernova drain.
+      const strength = Math.min(0.95, 0.28 + (event.strength ?? 0.5) * 0.55);
       this.forces.inject({
         kind,
         position: event.position ?? position,
         axis: event.axis ?? [Math.cos(pitch * 0.5), Math.sin(pitch * 0.13), Math.sin(pitch * 0.5)],
-        strength: 0.55 + (event.strength ?? 0.5) * 0.9,
+        strength,
         lifetime,
         radius: 36,
         color: event.color ?? color

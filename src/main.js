@@ -45,7 +45,8 @@ const params = {
   filmGrain: 0.08,
   vignette: 0.45,
   trailStrength: 0.4,
-  encounterRate: 1.0,
+  encounterRate: 0.5,
+  encounterSounds: 'off',
   synthVolume: 0.32,
   synthWaveform: 'triangle',
   synthCutoff: 4400
@@ -182,8 +183,10 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
       particles.reset(seed, params.spawnRadius);
       forces.list.length = 0;
       memory.clear();
+      encounterObjects.clear();
       mapper.originPlaced = false;
       mapper.eventCount = 0;
+      impactPulse = 0;
     } else if (action === 'clearMemory') {
       memory.clear();
     } else if (action === 'clearStructures') {
@@ -207,8 +210,10 @@ document.getElementById('reset-button')?.addEventListener('click', () => {
   particles.reset(seed, params.spawnRadius);
   forces.list.length = 0;
   memory.clear();
+  encounterObjects.clear();
   mapper.originPlaced = false;
   mapper.eventCount = 0;
+  impactPulse = 0;
 });
 document.getElementById('recenter-button')?.addEventListener('click', () => {
   scaleCamera.recenter();
@@ -258,6 +263,7 @@ const loop = new Loop({
     memory.decay(dt, params.memoryDecay);
     mapper.tick(dt);
     encounters.rate = params.encounterRate;
+    encounterObjects.soundEnabled = params.encounterSounds === 'on';
     encounters.update(dt);
     encounterObjects.update(dt, clock.now);
 
