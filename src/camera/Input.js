@@ -2,6 +2,7 @@ export function setupInput(target, camera) {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
+  const mark = () => camera.markInteraction(performance.now() / 1000);
 
   target.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
@@ -9,6 +10,7 @@ export function setupInput(target, camera) {
     lastX = e.clientX;
     lastY = e.clientY;
     target.setPointerCapture(e.pointerId);
+    mark();
   });
   target.addEventListener('pointermove', (e) => {
     if (!dragging) return;
@@ -17,6 +19,7 @@ export function setupInput(target, camera) {
     lastX = e.clientX;
     lastY = e.clientY;
     camera.nudgeRotation(-dx * 1.3, -dy * 0.9);
+    mark();
   });
   const release = (e) => {
     if (!dragging) return;
@@ -30,12 +33,13 @@ export function setupInput(target, camera) {
   target.addEventListener('wheel', (e) => {
     e.preventDefault();
     camera.nudgeZoom(-Math.sign(e.deltaY) * 0.075);
+    mark();
   }, { passive: false });
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
-    if (e.code === 'Digit1') camera.setTargetZoom(0.08);
-    else if (e.code === 'Digit2') camera.setTargetZoom(0.5);
-    else if (e.code === 'Digit3') camera.setTargetZoom(0.9);
+    if (e.code === 'Digit1') { camera.setTargetZoom(0.08); mark(); }
+    else if (e.code === 'Digit2') { camera.setTargetZoom(0.5); mark(); }
+    else if (e.code === 'Digit3') { camera.setTargetZoom(0.9); mark(); }
   });
 }

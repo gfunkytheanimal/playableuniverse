@@ -5,7 +5,7 @@ export const KINDS = {
   ribbon: 3
 };
 
-export const MAX_SOURCES = 32;
+export const MAX_SOURCES = 24;
 
 export class ForceSources {
   constructor() {

@@ -36,11 +36,17 @@ const INIT_VEL_FRAG = `
   void main() {
     float family = floor(h(vUv * 7.11) * 12.0);
     vec3 p = texture2D(uPos, vUv).xyz;
-    // Tangential seed: cross with up gives orbital motion around the origin
+    // Mix tangential (ordered orbital) + isotropic random so the field starts
+    // turbulent rather than synchronised. Synchronised orbits made the cloud
+    // look like a single moving blob; turbulence reads as a real volume.
     vec3 tang = normalize(cross(vec3(0.0, 1.0, 0.0), p) + 1e-4);
-    float speed = 2.4 + h(vUv * 9.1) * 1.8;
-    vec3 jitter = vec3(h(vUv * 13.9) - 0.5, (h(vUv * 19.3) - 0.5) * 0.6, h(vUv * 23.7) - 0.5) * 0.7;
-    gl_FragColor = vec4(tang * speed + jitter, family);
+    vec3 rnd = normalize(vec3(
+      h(vUv * 5.7)  - 0.5,
+      h(vUv * 13.3) - 0.5,
+      h(vUv * 23.9) - 0.5
+    ) + 1e-4);
+    float speed = 1.6 + h(vUv * 9.1) * 2.4;
+    gl_FragColor = vec4(mix(rnd, tang, 0.5) * speed, family);
   }
 `;
 
@@ -132,10 +138,12 @@ const VEL_FRAG = `
     accel += vec3(cos(fa + uTime * 0.05), 0.0, sin(fa + uTime * 0.05)) * 0.04 * (0.4 + uSongEnergy);
 
     // Cosmological expansion: gentle radial outward drift, amplified by audio
-    // energy so loud passages literally inflate the field. This is the
-    // counter-force that stops everything from piling at the centre.
+    // energy so loud passages literally inflate the field. The expansion
+    // weakens with distance so particles distribute into a soft nebula
+    // instead of piling against the confinement wall.
     float pr = length(p) + 1.0;
-    accel += (p / pr) * uExpansion * (0.6 + uSongEnergy * 4.5);
+    float expansionFalloff = exp(-pr / 240.0);
+    accel += (p / pr) * uExpansion * (0.6 + uSongEnergy * 4.5) * expansionFalloff;
 
     // accel clamp to prevent blow-ups when near a force center
     float amag = length(accel);
@@ -145,10 +153,11 @@ const VEL_FRAG = `
     v += accel * uDt;
     // damping (gentler so orbits persist) — user-tunable
     v *= pow(clamp(uDamping, 0.85, 0.9999), uDt * 60.0);
-    // soft confinement — sized so the expansion term still has somewhere to go
+    // soft confinement — gentle bounce so particles can drift through the
+    // boundary instead of sticking to it.
     float radius = length(p);
     float bound = 360.0;
-    if (radius > bound) v -= normalize(p) * (radius - bound) * 0.22;
+    if (radius > bound) v -= normalize(p) * (radius - bound) * 0.08;
 
     // velocity clamp
     float vmag = length(v);

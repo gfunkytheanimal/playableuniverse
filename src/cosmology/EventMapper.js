@@ -40,8 +40,8 @@ export class EventMapper {
       this.forces.inject({
         kind: 'shell',
         position,
-        strength: 0.9 + event.strength * 1.6,
-        lifetime: 1.8,
+        strength: 0.35 + event.strength * 0.7,
+        lifetime: 0.9,
         radius: 36,
         color
       });
@@ -51,8 +51,8 @@ export class EventMapper {
         kind,
         position,
         axis: radial.axis,
-        strength: 0.8 + event.strength * 1.8,
-        lifetime: kind === 'well' ? 7 : kind === 'vortex' ? 6 : kind === 'ribbon' ? 8 : 2.6,
+        strength: 0.3 + event.strength * 0.9,
+        lifetime: kind === 'well' ? 3.5 : kind === 'vortex' ? 3 : kind === 'ribbon' ? 4.2 : 1.4,
         radius: kind === 'well' ? 44 : 30,
         color
       });
@@ -62,30 +62,32 @@ export class EventMapper {
         kind,
         position,
         axis: radial.axis,
-        strength: 0.45 + event.strength * 0.9,
-        lifetime: kind === 'shell' ? 1.4 : 3.5,
+        strength: 0.18 + event.strength * 0.42,
+        lifetime: kind === 'shell' ? 0.8 : 1.8,
         radius: kind === 'well' ? 36 : 26,
         color
       });
     } else if (event.type === 'section') {
       this.lastSectionOrigin = position;
+      const axisAng = Math.cos(songTime * 0.1 + this.eventCount * 0.11) * 1.2;
       this.forces.inject({
         kind: 'vortex',
         position,
-        axis: [Math.sin(songTime * 0.1), 0.8, Math.cos(songTime * 0.1)],
-        strength: 1.8 + event.strength * 1.6,
-        lifetime: 11,
+        axis: [Math.sin(songTime * 0.1) * Math.sin(axisAng), Math.cos(axisAng), Math.cos(songTime * 0.1) * Math.sin(axisAng)],
+        strength: 0.7 + event.strength * 0.8,
+        lifetime: 6,
         radius: 90,
         color
       });
     } else if (event.type === 'impulse') {
       const kind = event.kind ?? 'shell';
-      const lifetime = event.lifetime ?? (kind === 'well' ? 5 : kind === 'vortex' ? 4 : 1.6);
+      const lifetime = event.lifetime ?? (kind === 'well' ? 3 : kind === 'vortex' ? 2.5 : 1);
+      const pitch = event.pitch ?? 0;
       this.forces.inject({
         kind,
         position: event.position ?? position,
-        axis: event.axis ?? [Math.cos((event.pitch ?? 0) * 0.5), 0.7, Math.sin((event.pitch ?? 0) * 0.5)],
-        strength: 1.1 + (event.strength ?? 0.5) * 1.6,
+        axis: event.axis ?? [Math.cos(pitch * 0.5), Math.sin(pitch * 0.13), Math.sin(pitch * 0.5)],
+        strength: 0.55 + (event.strength ?? 0.5) * 0.9,
         lifetime,
         radius: 36,
         color: event.color ?? color

@@ -12,6 +12,23 @@ export class ScaleCamera {
     this.focus = new THREE.Vector3();
     this.smoothedFocus = new THREE.Vector3();
     this.scaleLabel = 'outside observer';
+    this.focusProvider = null;
+    this.lastUserInteraction = 0;
+    this.autoOrbit = true;
+  }
+
+  setFocusProvider(fn) {
+    this.focusProvider = fn;
+  }
+
+  markInteraction(time) {
+    this.lastUserInteraction = time;
+  }
+
+  recenter() {
+    this.targetYaw = 0.35;
+    this.targetPitch = 0.18;
+    this.targetZoom = 0.42;
   }
 
   setTargetZoom(z) {
@@ -31,14 +48,20 @@ export class ScaleCamera {
     this.setRotation(this.targetYaw + dyaw, this.targetPitch + dpitch);
   }
 
-  update(dt, particles) {
+  update(dt, particles, now = performance.now() / 1000) {
     const focus = this._estimateFocus(particles);
-    this.smoothedFocus.lerp(focus, 1 - Math.pow(0.06, Math.max(0.001, dt)));
+    this.smoothedFocus.lerp(focus, 1 - Math.pow(0.18, Math.max(0.001, dt)));
 
     const k = 1 - Math.pow(0.012, Math.max(0.001, dt));
     this.zoom += (this.targetZoom - this.zoom) * k;
     this.yaw += (this.targetYaw - this.yaw) * k;
     this.pitch += (this.targetPitch - this.pitch) * k;
+
+    // Cinematic drift when idle: slowly orbit so the universe feels alive.
+    if (this.autoOrbit && now - this.lastUserInteraction > 4) {
+      this.targetYaw += dt * 0.04;
+      this.targetPitch = 0.18 + Math.sin(now * 0.05) * 0.12;
+    }
 
     const radius = THREE.MathUtils.lerp(420, 26, smoothstep(0.0, 0.78, this.zoom));
     const insideMix = smoothstep(0.78, 1.0, this.zoom);
@@ -66,8 +89,12 @@ export class ScaleCamera {
     else this.scaleLabel = 'first person';
   }
 
-  _estimateFocus(particles) {
-    return new THREE.Vector3(0, 0, 0);
+  _estimateFocus() {
+    if (this.focusProvider) {
+      const f = this.focusProvider();
+      if (f) return f;
+    }
+    return this.focus.set(0, 0, 0);
   }
 }
 
