@@ -56,13 +56,15 @@ const FRAG = `
     vec2 d = gl_PointCoord - 0.5;
     float r2 = dot(d, d);
     if (r2 > 0.25) discard;
-    float core = exp(-r2 * 20.0);
-    float halo = exp(-r2 * 6.0) * 0.32;
+    float core = exp(-r2 * 22.0);
+    float halo = exp(-r2 * 7.0) * 0.22;
     float glow = core + halo;
     vec3 base = vColor;
-    vec3 hot = mix(base, vec3(1.0), vEnergy * 0.7);
-    vec3 lit = hot * (0.6 + vMemory * 0.9) + base * vMemory * 0.4;
-    gl_FragColor = vec4(lit, glow * (0.55 + vEnergy * 0.6 + vMemory * 0.35));
+    vec3 hot = mix(base, vec3(1.0), vEnergy * 0.55);
+    vec3 lit = hot * (0.55 + vMemory * 0.7) + base * vMemory * 0.28;
+    // Slightly lower base alpha so dense clusters don't saturate to a white
+    // blob and sparse regions retain visible texture.
+    gl_FragColor = vec4(lit, glow * (0.38 + vEnergy * 0.5 + vMemory * 0.28));
   }
 `;
 

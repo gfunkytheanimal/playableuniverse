@@ -52,6 +52,7 @@ export class AdvancedPanel {
       ['Square (hollow)', 'square']
     ]);
     this._actions([
+      ['Recenter Camera', 'recenter'],
       ['Reset Universe', 'reset'],
       ['Clear Memory', 'clearMemory'],
       ['Clear Structures', 'clearStructures']
