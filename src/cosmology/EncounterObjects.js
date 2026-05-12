@@ -129,6 +129,7 @@ export class EncounterObjects {
     this.scene = scene;
     this.bus = bus;
     this.synth = synth;
+    this.soundEnabled = false; // off by default until tuning is dialed in
     this.objects = [];
 
     const positions = new Float32Array(MAX_OBJECTS * 3);
@@ -212,7 +213,7 @@ export class EncounterObjects {
     };
     this.objects.push(obj);
 
-    if (this.synth && typeof this.synth.playEncounter === 'function') {
+    if (this.soundEnabled && this.synth && typeof this.synth.playEncounter === 'function') {
       this.synth.playEncounter(type);
     }
   }

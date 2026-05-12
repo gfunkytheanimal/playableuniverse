@@ -106,9 +106,11 @@ const VEL_FRAG = `
         accel += tang * strength * (12.0 + uSwirlBias * 8.0) / (r * 0.25 + 1.2);
         accel += dir * strength * 0.6 / (r + 4.0);
       } else if (kind < 2.5) {
-        // shell: outward pulse
+        // shell: outward pulse. Halved from 48 -> 24 because a single
+        // strong shell could otherwise eject more energy than damping
+        // and confinement combined could retrieve.
         float falloff = exp(-r * 0.045);
-        accel += -dir * strength * 48.0 * falloff;
+        accel += -dir * strength * 24.0 * falloff;
       } else {
         // ribbon: pull toward an axis line through sp + flow along axis
         vec3 along = dot(d, axis) * axis;

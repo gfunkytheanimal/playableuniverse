@@ -65,6 +65,10 @@ export class AdvancedPanel {
       ['Sawtooth (bright)', 'sawtooth'],
       ['Square (hollow)', 'square']
     ]);
+    this._selectSection('Encounter sounds', 'encounterSounds', [
+      ['Off', 'off'],
+      ['On', 'on']
+    ]);
     this._actions([
       ['Trigger Encounter', 'encounter'],
       ['Clear Encounters', 'clearEncounters'],
