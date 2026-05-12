@@ -7,6 +7,8 @@ const SPLAT_VERT = `
   uniform float uTexRes;
   uniform float uHalfExtent;
   uniform float uSplatSize;
+  uniform float uPlaneThickness;
+  varying float vWeight;
   void main() {
     float i = position.x;
     float u = mod(i, uTexRes) / uTexRes + 0.5 / uTexRes;
@@ -15,11 +17,16 @@ const SPLAT_VERT = `
     vec2 xz = p.xz / uHalfExtent;
     gl_Position = vec4(xz, 0.0, 1.0);
     gl_PointSize = uSplatSize;
+    // Particles far from the y=0 plane contribute less density. Combined with
+    // the plane-attraction force in the velocity shader this collapses the
+    // field into a disk instead of a forest of vertical pillars.
+    vWeight = exp(-abs(p.y) / max(8.0, uPlaneThickness));
   }
 `;
 
 const SPLAT_FRAG = `
   precision highp float;
+  varying float vWeight;
   void main() {
     vec2 d = gl_PointCoord - 0.5;
     float r2 = dot(d, d);
@@ -28,7 +35,7 @@ const SPLAT_FRAG = `
     // Each particle deposits a tiny gaussian into the density field. With
     // additive blending these stack into a self-density map without needing
     // n-body computation on the CPU.
-    gl_FragColor = vec4(gauss * 0.025);
+    gl_FragColor = vec4(gauss * vWeight * 0.025);
   }
 `;
 
@@ -66,7 +73,8 @@ export class DensityField {
         uPos: { value: null },
         uTexRes: { value: particles.texRes },
         uHalfExtent: { value: this.halfExtent },
-        uSplatSize: { value: splatSize }
+        uSplatSize: { value: splatSize },
+        uPlaneThickness: { value: 60 }
       },
       transparent: true,
       depthWrite: false,
@@ -83,8 +91,9 @@ export class DensityField {
     return this.target.texture;
   }
 
-  update() {
+  update(planeThickness = 60) {
     this.material.uniforms.uPos.value = this.particles.positionTexture;
+    this.material.uniforms.uPlaneThickness.value = planeThickness;
     const prevColor = new THREE.Color();
     const prevAlpha = this.renderer.getClearAlpha();
     this.renderer.getClearColor(prevColor);

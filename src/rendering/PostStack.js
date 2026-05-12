@@ -11,13 +11,28 @@ const TONEMAP_FRAG = `
   uniform sampler2D uBloom;
   uniform float uBloomStrength;
   uniform float uExposure;
+  uniform float uGrain;
+  uniform float uVignette;
+  uniform float uTime;
   vec3 aces(vec3 x) {
     const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
   }
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
   void main() {
     vec3 hdr = texture2D(uScene, vUv).rgb + texture2D(uBloom, vUv).rgb * uBloomStrength;
     vec3 mapped = aces(hdr * uExposure);
+    // Vignette: soft radial darkening so the centre reads as luminous.
+    vec2 q = vUv - 0.5;
+    float vignette = smoothstep(0.78, 0.18, dot(q, q) * 1.4);
+    mapped *= mix(1.0, vignette, uVignette);
+    // Film grain: light animated noise so the field doesn't read as a sterile
+    // synthetic plot. Modulated by luminance so highlights stay clean.
+    float g = (hash(vUv * 1024.0 + uTime * 60.0) - 0.5);
+    float lum = max(mapped.r, max(mapped.g, mapped.b));
+    mapped += vec3(g) * uGrain * (1.0 - lum * 0.7);
     gl_FragColor = vec4(mapped, 1.0);
   }
 `;
@@ -83,7 +98,10 @@ export class PostStack {
         uScene: { value: null },
         uBloom: { value: null },
         uBloomStrength: { value: 1.0 },
-        uExposure: { value: 1.05 }
+        uExposure: { value: 1.05 },
+        uGrain: { value: 0.08 },
+        uVignette: { value: 0.45 },
+        uTime: { value: 0 }
       }
     });
 
@@ -110,6 +128,9 @@ export class PostStack {
   finish(params = {}) {
     if (params.bloomStrength !== undefined) this.toneMat.uniforms.uBloomStrength.value = params.bloomStrength;
     if (params.exposure !== undefined) this.toneMat.uniforms.uExposure.value = params.exposure;
+    if (params.grain !== undefined) this.toneMat.uniforms.uGrain.value = params.grain;
+    if (params.vignette !== undefined) this.toneMat.uniforms.uVignette.value = params.vignette;
+    if (params.time !== undefined) this.toneMat.uniforms.uTime.value = params.time;
     this.quad.material = this.highMat;
     this.highMat.uniforms.uSrc.value = this.scene.texture;
     this.renderer.setRenderTarget(this.highpass);
