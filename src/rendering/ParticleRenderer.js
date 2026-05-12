@@ -12,12 +12,14 @@ const VERT = `
   uniform float uHueShift;
   uniform float uMemoryBlend;
   uniform float uPaletteMix;
+  uniform float uTime;
   uniform vec2 uViewport;
   varying vec3 vColor;
   varying float vEnergy;
   varying float vMemory;
   varying float vWarmth;
   varying float vClass;
+  varying float vTwinkle;
   vec3 familyColor(float f, float hueShift, float paletteMix) {
     float a = (f / 12.0) * 6.2831853 + hueShift;
     vec3 wheel = 0.5 + 0.5 * vec3(cos(a), cos(a + 2.094), cos(a + 4.189));
@@ -26,6 +28,16 @@ const VERT = `
   }
   float hash11(float x) {
     return fract(sin(x * 12.9898) * 43758.5453);
+  }
+  // Five stellar temperatures, roughly matched to real spectral types. The
+  // returned RGB is multiplied against the family colour so palette swaps
+  // still work — these add temperature variety on top.
+  vec3 stellarTemp(float t) {
+    if (t < 0.18)      return vec3(1.55, 1.25, 0.65); // red giant
+    else if (t < 0.40) return vec3(1.50, 1.05, 0.55); // orange (K)
+    else if (t < 0.62) return vec3(1.40, 1.30, 0.95); // yellow (G, sol-like)
+    else if (t < 0.86) return vec3(1.20, 1.30, 1.45); // white (A/F)
+    else               return vec3(0.85, 1.15, 1.65); // blue (O/B)
   }
   void main() {
     float i = position.x;
@@ -43,38 +55,49 @@ const VERT = `
     // Stellar class — stable per particle. Most are dust; a small fraction
     // are giants and supergiants that read as actual stars.
     float roll = hash11(i * 0.0173 + 7.31);
+    float tempRoll = hash11(i * 0.0211 + 13.7);
+    float twinkleSeed = hash11(i * 0.041 + 91.7);
     float classSize;
     float classWarmth;
     float classEmit;
+    float twinkleAmt;
     if (roll < 0.004) {           // 0.4% supergiants
       classSize = 5.5;
       classWarmth = 0.85;
       classEmit = 1.8;
+      twinkleAmt = 0.06;
       vClass = 3.0;
     } else if (roll < 0.024) {    // 2% giants
       classSize = 2.6;
       classWarmth = 0.55;
       classEmit = 1.25;
+      twinkleAmt = 0.10;
       vClass = 2.0;
     } else if (roll < 0.12) {     // 9.6% main-sequence stars
       classSize = 1.4;
       classWarmth = 0.25;
       classEmit = 0.95;
+      twinkleAmt = 0.16;
       vClass = 1.0;
     } else {                      // 88% dust
       classSize = 0.78 + hash11(i * 0.041) * 0.42;
       classWarmth = 0.0;
       classEmit = 0.6;
+      twinkleAmt = 0.22;
       vClass = 0.0;
     }
     vec3 base = familyColor(family, uHueShift, uPaletteMix);
-    vec3 warmTint = vec3(1.55, 1.25, 0.82);
-    vec3 stellar = mix(base, warmTint, classWarmth);
+    // Mix family colour with stellar temperature — gives real colour variety
+    // (blue O-stars, red giants, yellow sol-likes) on top of the palette.
+    vec3 temp = stellarTemp(tempRoll);
+    float tempMix = mix(0.35, 0.85, smoothstep(0.0, 3.0, vClass));
+    vec3 stellar = mix(base, base * temp, tempMix);
     vec3 tinted = mix(stellar, mem.rgb * 1.2, clamp(length(mem.rgb) * uMemoryBlend, 0.0, 0.85));
     vColor = tinted * classEmit;
     vWarmth = classWarmth;
     vEnergy = clamp(length(vel.xyz) * 0.05, 0.0, 1.0);
     vMemory = clamp(length(mem.rgb), 0.0, 1.2);
+    vTwinkle = 1.0 - twinkleAmt * (0.5 + 0.5 * sin(uTime * (0.7 + twinkleSeed * 4.5) + twinkleSeed * 31.7));
     vec4 mv = modelViewMatrix * vec4(world, 1.0);
     gl_Position = projectionMatrix * mv;
     float dist = max(0.1, -mv.z);
@@ -89,6 +112,7 @@ const FRAG = `
   varying float vMemory;
   varying float vWarmth;
   varying float vClass;
+  varying float vTwinkle;
   void main() {
     vec2 d = gl_PointCoord - 0.5;
     float r2 = dot(d, d);
@@ -104,7 +128,7 @@ const FRAG = `
     vec3 hot = mix(base, vec3(1.0), vEnergy * 0.55 + vWarmth * 0.3);
     vec3 lit = hot * (0.55 + vMemory * 0.7) + base * vMemory * 0.28;
     float alphaBase = mix(0.38, 0.55, smoothstep(0.0, 3.0, vClass));
-    gl_FragColor = vec4(lit, glow * (alphaBase + vEnergy * 0.5 + vMemory * 0.28));
+    gl_FragColor = vec4(lit * vTwinkle, glow * vTwinkle * (alphaBase + vEnergy * 0.5 + vMemory * 0.28));
   }
 `;
 
@@ -137,6 +161,7 @@ export class ParticleRenderer {
         uHueShift: { value: 0 },
         uMemoryBlend: { value: 0.6 },
         uPaletteMix: { value: 0 },
+        uTime: { value: 0 },
         uViewport: { value: new THREE.Vector2(1, 1) }
       },
       transparent: true,
@@ -162,6 +187,7 @@ export class ParticleRenderer {
     if (params.memoryBlend !== undefined) this.material.uniforms.uMemoryBlend.value = params.memoryBlend;
     if (params.hueShift !== undefined) this.material.uniforms.uHueShift.value = params.hueShift;
     if (params.paletteMix !== undefined) this.material.uniforms.uPaletteMix.value = params.paletteMix;
+    if (params.time !== undefined) this.material.uniforms.uTime.value = params.time;
     const size = new THREE.Vector2();
     this.renderer.getSize(size);
     this.material.uniforms.uViewport.value.set(size.x, size.y);
