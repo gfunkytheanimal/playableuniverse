@@ -16,7 +16,7 @@ export function setupInput(target, camera) {
     const dy = (e.clientY - lastY) / target.clientHeight;
     lastX = e.clientX;
     lastY = e.clientY;
-    camera.nudgeRotation(-dx * 2.4, -dy * 1.6);
+    camera.nudgeRotation(-dx * 1.3, -dy * 0.9);
   });
   const release = (e) => {
     if (!dragging) return;
@@ -29,7 +29,7 @@ export function setupInput(target, camera) {
 
   target.addEventListener('wheel', (e) => {
     e.preventDefault();
-    camera.nudgeZoom(-Math.sign(e.deltaY) * 0.045);
+    camera.nudgeZoom(-Math.sign(e.deltaY) * 0.075);
   }, { passive: false });
 
   window.addEventListener('keydown', (e) => {

@@ -24,10 +24,11 @@ const ALL_KEYS = [...LOWER_ROW, ...UPPER_ROW];
 const BY_CODE = Object.fromEntries(ALL_KEYS.map((k) => [k.code, k]));
 
 export class Piano {
-  constructor(bus, root, { onTrigger } = {}) {
+  constructor(bus, root, { onTrigger, synth } = {}) {
     this.bus = bus;
     this.root = root;
     this.onTrigger = onTrigger;
+    this.synth = synth;
     this.held = new Set();
     this.eventTime = 0;
     this._wireKeys();
@@ -83,12 +84,13 @@ export class Piano {
   trigger(info, strength) {
     this.eventTime += 0.001;
     const angle = (info.note / 12) * Math.PI * 2;
-    const radius = 30 + (info.note % 5) * 8;
+    const radius = 60 + (info.note % 5) * 18;
     const position = [
       Math.cos(angle) * radius,
-      ((info.note % 12) - 6) * 1.4,
+      ((info.note % 12) - 6) * 1.8,
       Math.sin(angle) * radius
     ];
+    if (this.synth) this.synth.playNote(info.note, strength);
     this.bus.emit('event', {
       type: 'impulse',
       kind: info.kind,

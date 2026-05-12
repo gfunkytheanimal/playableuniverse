@@ -17,6 +17,7 @@ export class EventMapper {
     this.eventCount = 0;
     this.songEnergy = 0;
     this.audioReactivity = 1;
+    this.originStrength = 0.45;
   }
 
   handle(event, songTime) {
@@ -108,46 +109,39 @@ export class EventMapper {
 
   _placeOrigin(event) {
     const color = BAND_COLORS[event.band] ?? BAND_COLORS.broadband;
-    // Seed singularity: short-lived and balanced by tangential swirl in the well shader
-    this.forces.inject({
-      kind: 'well',
-      position: [0, 0, 0],
-      axis: [0, 1, 0],
-      strength: 0.7,
-      lifetime: 9,
-      radius: 60,
-      color
-    });
-    // Companion vortex so the seed grows as a rotating disk, not a pile
+    // A faint seed only — the origin should not dominate the cosmology.
+    // Most of the structure comes from the audio events that follow.
     this.forces.inject({
       kind: 'vortex',
       position: [0, 0, 0],
       axis: [0, 1, 0],
-      strength: 0.9,
-      lifetime: 14,
-      radius: 80,
+      strength: this.originStrength,
+      lifetime: 6,
+      radius: 60,
       color
     });
-    this.memory.stamp({ position: [0, 0, 0], radius: 0.12, intensity: 1.2, color });
+    this.memory.stamp({ position: [0, 0, 0], radius: 0.05, intensity: 0.4, color });
   }
 
   _radialPlacement(songTime, event) {
-    const phi = (songTime * 0.31 + this.eventCount * 0.618) * Math.PI * 2;
-    const elev = Math.sin(songTime * 0.07 + this.eventCount * 0.19) * 0.6;
+    // Spread events across a much wider volume so the universe forms multiple
+    // distinct centres rather than piling around the origin.
+    const phi = (songTime * 0.27 + this.eventCount * 1.61803398) * Math.PI * 2;
+    const elev = Math.sin(songTime * 0.05 + this.eventCount * 0.27) * 0.85;
     const bandRadius = {
-      sub: 14,
-      bass: 26,
-      lowMid: 48,
-      mid: 72,
-      highMid: 110,
-      high: 150,
-      broadband: 90
-    }[event.band] ?? 70;
-    const r = bandRadius + event.strength * 26;
+      sub: 60,
+      bass: 80,
+      lowMid: 110,
+      mid: 140,
+      highMid: 170,
+      high: 200,
+      broadband: 130
+    }[event.band] ?? 130;
+    const r = bandRadius + event.strength * 50 + (this.eventCount % 7) * 8;
     const c = Math.cos(elev);
     const position = [
       Math.cos(phi) * r * c,
-      Math.sin(elev) * r * 0.55,
+      Math.sin(elev) * r * 0.6,
       Math.sin(phi) * r * c
     ];
     const axis = [Math.sin(phi * 1.7), 0.7, Math.cos(phi * 1.3)];

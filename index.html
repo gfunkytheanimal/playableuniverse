@@ -9,8 +9,13 @@
   <body>
     <canvas id="stage"></canvas>
 
-    <button id="upload-button" class="corner-button" type="button">Upload Song</button>
+    <div id="upload-stack" class="corner-stack">
+      <button id="upload-button" class="corner-button" type="button">Upload Song</button>
+      <button id="structure-button" class="corner-button" type="button">Add Structure</button>
+      <button id="reset-button" class="corner-button" type="button">Reset Universe</button>
+    </div>
     <input id="file-input" type="file" accept="audio/*" hidden />
+    <input id="structure-input" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
 
     <div id="advanced-panel" class="corner-panel" data-collapsed="true">
       <button class="panel-toggle" type="button" aria-controls="panel-body">Advanced</button>
