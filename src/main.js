@@ -26,18 +26,19 @@ canvas.style.width = '100%';
 canvas.style.height = '100%';
 
 const params = {
-  forceGain: 1.1,
-  damping: 0.993,
-  swirlBias: 1,
+  forceGain: 1.4,
+  damping: 0.997,
+  swirlBias: 1.2,
   timeScale: 1,
+  expansion: 0.55,
   originStrength: 0.45,
-  pointSize: 2.4,
-  bloomStrength: 1.1,
-  exposure: 1.1,
-  memoryBlend: 0.7,
-  audioReactivity: 1.3,
+  pointSize: 1.9,
+  bloomStrength: 1.2,
+  exposure: 1.05,
+  memoryBlend: 0.75,
+  audioReactivity: 1.4,
   memoryDecay: 0.9998,
-  spawnRadius: 110,
+  spawnRadius: 150,
   palette: 'spectral',
   synthVolume: 0.32,
   synthWaveform: 'triangle',
@@ -171,22 +172,27 @@ const loop = new Loop({
       forceGain: params.forceGain,
       damping: params.damping,
       swirlBias: params.swirlBias,
-      timeScale: params.timeScale
+      timeScale: params.timeScale,
+      expansion: params.expansion
     });
     scaleCamera.update(dt, particles);
 
     const palette = PALETTES[params.palette] ?? PALETTES.spectral;
+    const audioPulse = Math.min(1.5, analyzer.rms * params.audioReactivity * 2.2 + analyzer.flux * 12);
     renderer.update({
-      pointSize: params.pointSize,
+      pointSize: params.pointSize * (1 + audioPulse * 0.35),
       memoryBlend: params.memoryBlend,
-      hueShift: palette.hueShift,
+      hueShift: palette.hueShift + analyzer.centroid * 0.6,
       paletteMix: palette.paletteMix
     });
 
     post.beginScene();
     engine.renderer.clear(true, true, false);
     engine.renderer.render(engine.scene, engine.camera);
-    post.finish({ bloomStrength: params.bloomStrength, exposure: params.exposure });
+    post.finish({
+      bloomStrength: params.bloomStrength * (1 + audioPulse * 0.5),
+      exposure: params.exposure * (1 + audioPulse * 0.15)
+    });
 
     hud.update();
   }

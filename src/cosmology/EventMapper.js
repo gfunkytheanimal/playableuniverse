@@ -144,7 +144,16 @@ export class EventMapper {
       Math.sin(elev) * r * 0.6,
       Math.sin(phi) * r * c
     ];
-    const axis = [Math.sin(phi * 1.7), 0.7, Math.cos(phi * 1.3)];
+    // Isotropic axis — no Y-bias. Previous (sin, 0.7, cos) constantly pushed
+    // ribbons upward, producing the "trail upward" you saw.
+    const axisPhi = phi * 1.7;
+    const axisTheta = Math.cos(elev * 2.3 + this.eventCount * 0.11) * 1.2;
+    const ax = Math.sin(axisTheta);
+    const axis = [
+      Math.cos(axisPhi) * ax,
+      Math.cos(axisTheta),
+      Math.sin(axisPhi) * ax
+    ];
     return { position, axis };
   }
 
