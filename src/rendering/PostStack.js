@@ -134,6 +134,22 @@ export class PostStack {
     this.blurB.setSize(s.x / 4, s.y / 4);
   }
 
+  clearAccumulation() {
+    // Wipe both trail-buffer RTs. Anything poisonous in there (NaN, runaway
+    // brightness) gets reset; otherwise reset-universe leaves the old frame
+    // ghosting forever.
+    const prevColor = new THREE.Color();
+    const prevAlpha = this.renderer.getClearAlpha();
+    this.renderer.getClearColor(prevColor);
+    this.renderer.setClearColor(0x000000, 1);
+    this.renderer.setRenderTarget(this.scene);
+    this.renderer.clear(true, false, false);
+    this.renderer.setRenderTarget(this.fadeTarget);
+    this.renderer.clear(true, false, false);
+    this.renderer.setRenderTarget(null);
+    this.renderer.setClearColor(prevColor, prevAlpha);
+  }
+
   beginScene(trailStrength = 0) {
     this.resize();
     if (trailStrength <= 0.005) {

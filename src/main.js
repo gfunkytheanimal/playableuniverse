@@ -184,6 +184,7 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
       forces.list.length = 0;
       memory.clear();
       encounterObjects.clear();
+      post.clearAccumulation();
       mapper.originPlaced = false;
       mapper.eventCount = 0;
       impactPulse = 0;
@@ -211,6 +212,7 @@ document.getElementById('reset-button')?.addEventListener('click', () => {
   forces.list.length = 0;
   memory.clear();
   encounterObjects.clear();
+  post.clearAccumulation();
   mapper.originPlaced = false;
   mapper.eventCount = 0;
   impactPulse = 0;

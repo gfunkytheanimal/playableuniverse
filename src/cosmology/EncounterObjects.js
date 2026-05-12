@@ -240,20 +240,11 @@ export class EncounterObjects {
       }
       o.pos.addScaledVector(o.vel, dt);
 
-      // Periodic local disturbance so the particle field can feel them.
-      if (o.age - o.lastEmit > o.cfg.emitInterval) {
-        o.lastEmit = o.age;
-        this.bus.emit('event', {
-          type: 'impulse',
-          kind: o.cfg.emitKind,
-          band: 'broadband',
-          strength: o.cfg.emitStrength,
-          lifetime: 0.5,
-          position: [o.pos.x, o.pos.y, o.pos.z],
-          axis: [o.vel.x, o.vel.y, o.vel.z],
-          color: o.cfg.color
-        });
-      }
+      // Visual-only by design — these objects do NOT push the particle
+      // field. Earlier versions injected force impulses as they flew which
+      // could (with the wrong axis from a momentarily-zero velocity) feed
+      // NaN into the GPU sim and poof the universe. Decoupling them from
+      // the physics keeps the sim a closed system.
 
       // Despawn if life over or it flew way out of the visible volume.
       const r = o.pos.length();

@@ -207,6 +207,11 @@ const VEL_FRAG = `
     float vmag = length(v);
     if (vmag > 80.0) v *= 80.0 / vmag;
 
+    // NaN guard: a single NaN here would propagate through density and
+    // memory next frame and infect the whole field. Standard isnan trick:
+    // x != x is true only for NaN. Replace with zero rather than carry it.
+    if (!(v.x == v.x) || !(v.y == v.y) || !(v.z == v.z)) v = vec3(0.0);
+
     gl_FragColor = vec4(v, family);
   }
 `;
@@ -221,6 +226,12 @@ const POS_FRAG = `
     vec4 pos = texture2D(uPos, vUv);
     vec4 vel = texture2D(uVel, vUv);
     vec3 p = pos.xyz + vel.xyz * uDt;
+    // NaN guard. If any axis is NaN, snap the particle back to a random-ish
+    // safe position rather than propagate the poison into the density and
+    // memory textures next frame.
+    if (!(p.x == p.x) || !(p.y == p.y) || !(p.z == p.z)) {
+      p = vec3((vUv.x - 0.5) * 200.0, 0.0, (vUv.y - 0.5) * 200.0);
+    }
     // Hard radial clamp — anything past the absolute boundary gets snapped
     // back. A strong shell (supernova, collision) can otherwise eject
     // particles far enough that the soft confinement can't recover them and
