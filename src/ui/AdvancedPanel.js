@@ -14,12 +14,22 @@ export class AdvancedPanel {
 
   _build() {
     this.body.innerHTML = '';
+    this._presets('Shape preset', [
+      ['Nebula', 'nebula'],
+      ['Galaxy', 'galaxy'],
+      ['Cluster', 'cluster'],
+      ['Void', 'void'],
+      ['Disk', 'disk'],
+      ['Chaos', 'chaos']
+    ]);
     this._section('Physics', [
       ['Force gain', 'forceGain', 0.2, 4.0, 0.05],
       ['Damping', 'damping', 0.9, 0.9999, 0.0005],
       ['Swirl bias', 'swirlBias', 0.0, 3.0, 0.05],
       ['Expansion', 'expansion', 0.0, 2.5, 0.05],
       ['Self-gravity', 'cluster', 0.0, 2.5, 0.05],
+      ['Plane gravity', 'planeAttraction', 0.0, 1.5, 0.02],
+      ['Plane thickness', 'planeThickness', 8, 240, 2],
       ['Time scale', 'timeScale', 0.1, 3.0, 0.05],
       ['Origin strength', 'originStrength', 0.0, 2.0, 0.05]
     ]);
@@ -31,7 +41,9 @@ export class AdvancedPanel {
     this._section('Visuals', [
       ['Point size', 'pointSize', 0.4, 8.0, 0.1],
       ['Bloom', 'bloomStrength', 0.0, 3.5, 0.05],
-      ['Exposure', 'exposure', 0.3, 3.0, 0.05]
+      ['Exposure', 'exposure', 0.3, 3.0, 0.05],
+      ['Film grain', 'filmGrain', 0.0, 0.6, 0.01],
+      ['Vignette', 'vignette', 0.0, 1.2, 0.02]
     ]);
     this._selectSection('Palette', 'palette', [
       ['Spectral wheel', 'spectral'],
@@ -90,6 +102,30 @@ export class AdvancedPanel {
       row.appendChild(value);
       wrap.appendChild(row);
     }
+    this.body.appendChild(wrap);
+  }
+
+  _presets(title, options) {
+    const wrap = document.createElement('div');
+    wrap.className = 'panel-section';
+    const h = document.createElement('h4');
+    h.textContent = title;
+    wrap.appendChild(h);
+    const row = document.createElement('div');
+    row.className = 'panel-row preset-row';
+    for (const [label, key] of options) {
+      const btn = document.createElement('button');
+      btn.className = 'panel-action preset';
+      btn.type = 'button';
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        this.hooks.onAction?.('preset:' + key);
+        // Rebuild panel so slider positions reflect new params
+        this._build();
+      });
+      row.appendChild(btn);
+    }
+    wrap.appendChild(row);
     this.body.appendChild(wrap);
   }
 

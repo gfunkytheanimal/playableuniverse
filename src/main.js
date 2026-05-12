@@ -26,10 +26,12 @@ canvas.style.height = '100%';
 const params = {
   forceGain: 0.85,
   damping: 0.996,
-  swirlBias: 1.0,
+  swirlBias: 1.4,
   timeScale: 1,
-  expansion: 1.2,
-  cluster: 0.85,
+  expansion: 1.0,
+  cluster: 1.0,
+  planeAttraction: 0.45,
+  planeThickness: 50,
   originStrength: 0.28,
   pointSize: 1.7,
   bloomStrength: 0.85,
@@ -38,9 +40,20 @@ const params = {
   memoryDecay: 0.9998,
   spawnRadius: 200,
   palette: 'spectral',
+  filmGrain: 0.08,
+  vignette: 0.45,
   synthVolume: 0.32,
   synthWaveform: 'triangle',
   synthCutoff: 4400
+};
+
+const PRESETS = {
+  nebula:  { expansion: 1.6, cluster: 0.45, swirlBias: 0.6, forceGain: 0.55, planeAttraction: 0.05, planeThickness: 160, damping: 0.997 },
+  galaxy:  { expansion: 0.7, cluster: 1.7,  swirlBias: 2.4, forceGain: 0.95, planeAttraction: 0.8,  planeThickness: 28,  damping: 0.996 },
+  cluster: { expansion: 0.25,cluster: 2.2,  swirlBias: 0.5, forceGain: 0.7,  planeAttraction: 0.15, planeThickness: 80,  damping: 0.998 },
+  void:    { expansion: 2.1, cluster: 0.15, swirlBias: 0.4, forceGain: 0.35, planeAttraction: 0.0,  planeThickness: 200, damping: 0.994 },
+  disk:    { expansion: 0.55,cluster: 1.4,  swirlBias: 1.8, forceGain: 0.8,  planeAttraction: 1.1,  planeThickness: 18,  damping: 0.997 },
+  chaos:   { expansion: 1.4, cluster: 0.9,  swirlBias: 2.6, forceGain: 1.2,  planeAttraction: 0.0,  planeThickness: 200, damping: 0.992 }
 };
 
 const PALETTES = {
@@ -99,9 +112,23 @@ function dismissOverlay() {
   dropOverlay?.classList.add('dismissed');
 }
 
+// Brief visual impact pulse driven by piano hits.
+let impactPulse = 0;
+let sustainHeld = false;
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') sustainHeld = true;
+});
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') sustainHeld = false;
+});
+
 const piano = new Piano(bus, document.getElementById('piano'), {
   synth,
-  onTrigger: dismissOverlay
+  sustainCheck: () => sustainHeld,
+  onTrigger: (info, strength) => {
+    dismissOverlay();
+    impactPulse = Math.min(1.2, impactPulse + (strength ?? 0.9) * 0.45 + (info?.drum ? 0.4 : 0));
+  }
 });
 
 // Structure loader: click button or drag .glb onto the page.
@@ -154,6 +181,10 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
       structures.clear();
     } else if (action === 'recenter') {
       scaleCamera.recenter();
+    } else if (action.startsWith('preset:')) {
+      const key = action.slice(7);
+      const preset = PRESETS[key];
+      if (preset) Object.assign(params, preset);
     }
   }
 });
@@ -185,7 +216,7 @@ const loop = new Loop({
     memory.decay(dt, params.memoryDecay);
     mapper.tick(dt);
 
-    density.update();
+    density.update(params.planeThickness);
 
     particles.step(dt, forces, memory, density, 0, clock.now, {
       forceGain: params.forceGain,
@@ -193,14 +224,17 @@ const loop = new Loop({
       swirlBias: params.swirlBias,
       timeScale: params.timeScale,
       expansion: params.expansion,
-      cluster: params.cluster
+      cluster: params.cluster,
+      planeAttraction: params.planeAttraction,
+      planeThickness: params.planeThickness
     });
     scaleCamera.update(dt, particles);
     starfield.update(clock.now);
 
+    impactPulse *= Math.pow(0.06, dt); // decay impact flash quickly
     const palette = PALETTES[params.palette] ?? PALETTES.spectral;
     renderer.update({
-      pointSize: params.pointSize,
+      pointSize: params.pointSize * (1 + impactPulse * 0.35),
       memoryBlend: params.memoryBlend,
       hueShift: palette.hueShift,
       paletteMix: palette.paletteMix
@@ -209,7 +243,13 @@ const loop = new Loop({
     post.beginScene();
     engine.renderer.clear(true, true, false);
     engine.renderer.render(engine.scene, engine.camera);
-    post.finish({ bloomStrength: params.bloomStrength, exposure: params.exposure });
+    post.finish({
+      bloomStrength: params.bloomStrength * (1 + impactPulse * 0.4),
+      exposure: params.exposure * (1 + impactPulse * 0.12),
+      grain: params.filmGrain,
+      vignette: params.vignette,
+      time: clock.now
+    });
 
     hud.update();
   }

@@ -66,6 +66,8 @@ const VEL_FRAG = `
   uniform float uSwirlBias;
   uniform float uExpansion;
   uniform float uCluster;
+  uniform float uPlaneAttraction;
+  uniform float uPlaneThickness;
   uniform int uForceCount;
   uniform vec4 uForcePos[${MAX_SOURCES}];
   uniform vec4 uForceMeta[${MAX_SOURCES}];
@@ -146,6 +148,18 @@ const VEL_FRAG = `
     float pr = length(p) + 1.0;
     float expansionFalloff = exp(-pr / 240.0);
     accel += (p / pr) * uExpansion * (0.6 + uSongEnergy * 4.5) * expansionFalloff;
+
+    // Galactic-plane attraction: weak pull toward y=0 plus a damping term on
+    // vy when the particle is far from the plane. Without this, 2D density
+    // clustering produces vertical pillars because nothing constrains y.
+    // The attraction softens near the plane so the field forms a fluffy
+    // disc rather than crashing onto a sheet.
+    float planeDist = abs(p.y);
+    float planeFactor = planeDist / (uPlaneThickness + 1.0);
+    accel.y -= p.y * uPlaneAttraction * (0.18 + planeFactor * 0.55);
+    if (planeDist > uPlaneThickness * 1.4) {
+      v.y *= pow(0.97, uDt * 60.0);
+    }
 
     // Self-gravity via density field: sample the 2D self-density map and pull
     // particles up the gradient. This is what lets the field self-organise
@@ -265,6 +279,8 @@ export class ParticleField {
         uSwirlBias: { value: 1 },
         uExpansion: { value: 0.4 },
         uCluster: { value: 0.8 },
+        uPlaneAttraction: { value: 0.35 },
+        uPlaneThickness: { value: 60 },
         uForceCount: { value: 0 },
         uForcePos: { value: this.forcePos },
         uForceMeta: { value: this.forceMeta }
@@ -318,6 +334,8 @@ export class ParticleField {
     this.velMat.uniforms.uSwirlBias.value = opts.swirlBias ?? 1;
     this.velMat.uniforms.uExpansion.value = opts.expansion ?? 0.4;
     this.velMat.uniforms.uCluster.value = density ? (opts.cluster ?? 0.8) : 0;
+    this.velMat.uniforms.uPlaneAttraction.value = opts.planeAttraction ?? 0.35;
+    this.velMat.uniforms.uPlaneThickness.value = opts.planeThickness ?? 60;
     this.velMat.uniforms.uForceCount.value = count;
     this.velMat.uniforms.uForcePos.value = this.forcePos;
     this.velMat.uniforms.uForceMeta.value = this.forceMeta;

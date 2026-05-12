@@ -26,11 +26,12 @@ const ALL_KEYS = [...LOWER_ROW, ...UPPER_ROW, DRUM_KEY];
 const BY_CODE = Object.fromEntries(ALL_KEYS.map((k) => [k.code, k]));
 
 export class Piano {
-  constructor(bus, root, { onTrigger, synth } = {}) {
+  constructor(bus, root, { onTrigger, synth, sustainCheck } = {}) {
     this.bus = bus;
     this.root = root;
     this.onTrigger = onTrigger;
     this.synth = synth;
+    this.sustainCheck = sustainCheck ?? (() => false);
     this.held = new Set();
     this.eventTime = 0;
     this._wireKeys();
@@ -85,6 +86,7 @@ export class Piano {
 
   trigger(info, strength) {
     this.eventTime += 0.001;
+    const sustain = this.sustainCheck();
     if (info.drum) {
       if (this.synth) this.synth.playDrum(strength);
       // Drum spawns a wide outward shock from a varying random position
@@ -98,9 +100,10 @@ export class Piano {
         time: this.eventTime,
         strength: 1,
         position,
-        axis: [Math.cos(phi), 0, Math.sin(phi)]
+        axis: [Math.cos(phi), 0, Math.sin(phi)],
+        lifetime: sustain ? 3.6 : 1.2
       });
-      if (this.onTrigger) this.onTrigger(info);
+      if (this.onTrigger) this.onTrigger(info, strength);
       return;
     }
     const angle = (info.note / 12) * Math.PI * 2;
@@ -110,10 +113,14 @@ export class Piano {
       ((info.note % 12) - 6) * 1.8,
       Math.sin(angle) * radius
     ];
-    if (this.synth) this.synth.playNote(info.note, strength, { waveform: info.waveform });
+    if (this.synth) this.synth.playNote(info.note, strength, {
+      waveform: info.waveform,
+      release: sustain ? 3.0 : 1.1
+    });
     // Isotropic axis — different per note, no Y bias
     const axisT = info.note * 0.41;
     const axis = [Math.sin(axisT * 1.3), Math.cos(axisT * 0.9), Math.cos(axisT * 1.7)];
+    const baseLife = info.kind === 'well' ? 3 : info.kind === 'vortex' ? 2.5 : info.kind === 'ribbon' ? 3.2 : 1;
     this.bus.emit('event', {
       type: 'impulse',
       kind: info.kind,
@@ -122,8 +129,9 @@ export class Piano {
       strength,
       position,
       axis,
-      pitch: info.note
+      pitch: info.note,
+      lifetime: sustain ? baseLife * 3.5 : baseLife
     });
-    if (this.onTrigger) this.onTrigger(info);
+    if (this.onTrigger) this.onTrigger(info, strength);
   }
 }
