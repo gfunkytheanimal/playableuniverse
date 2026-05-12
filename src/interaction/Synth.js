@@ -84,6 +84,118 @@ export class Synth {
     partial.stop(t + attack + release + 0.05);
   }
 
+  playEncounter(type) {
+    if (type === 'meteor') this.playMeteorWoosh();
+    else if (type === 'comet') this.playCometSweep(0.55);
+    else if (type === 'ship') this.playShipHum();
+    else if (type === 'ufo') this.playUfoWobble();
+    else if (type === 'asteroid') this.playAsteroidRumble();
+    else if (type === 'satellite') this.playPulsarBeat(0.55);
+  }
+
+  playMeteorWoosh(intensity = 0.55) {
+    const ctx = this.ensureContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime;
+    const dur = 0.55;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 1.6);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(4800, t);
+    lp.frequency.exponentialRampToValueAtTime(420, t + dur);
+    lp.Q.value = 2.2;
+    const gain = ctx.createGain();
+    gain.gain.value = intensity * 0.35;
+    src.connect(lp).connect(gain).connect(this.master);
+    src.start(t);
+  }
+
+  playShipHum(intensity = 0.4) {
+    const ctx = this.ensureContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime;
+    const dur = 2.0;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = 130;
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 5.5;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 6;
+    lfo.connect(lfoGain).connect(osc.frequency);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    lp.Q.value = 3;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(intensity * 0.28, t + 0.25);
+    env.gain.linearRampToValueAtTime(intensity * 0.18, t + dur - 0.4);
+    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(lp).connect(env).connect(this.master);
+    osc.start(t); lfo.start(t);
+    osc.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  }
+
+  playUfoWobble(intensity = 0.5) {
+    const ctx = this.ensureContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime;
+    const dur = 2.4;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = 480;
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 3.2;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 220;
+    lfo.connect(lfoGain).connect(osc.frequency);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(intensity * 0.28, t + 0.4);
+    env.gain.linearRampToValueAtTime(intensity * 0.22, t + dur - 0.5);
+    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(env).connect(this.master);
+    osc.start(t); lfo.start(t);
+    osc.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  }
+
+  playAsteroidRumble(intensity = 0.6) {
+    const ctx = this.ensureContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime;
+    const dur = 2.6;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    // Brownish noise
+    let last = 0;
+    for (let i = 0; i < data.length; i++) {
+      last = (last + (Math.random() * 2 - 1) * 0.06) * 0.98;
+      data[i] = last;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 220;
+    lp.Q.value = 0.8;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(intensity * 0.6, t + 0.4);
+    env.gain.linearRampToValueAtTime(intensity * 0.4, t + dur - 0.5);
+    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(lp).connect(env).connect(this.master);
+    src.start(t);
+  }
+
   playSupernova(intensity = 1.0) {
     const ctx = this.ensureContext();
     if (ctx.state === 'suspended') ctx.resume();
