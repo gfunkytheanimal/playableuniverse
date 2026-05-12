@@ -217,6 +217,7 @@ html, body {
 }
 #hud #hud-scale { color: rgba(156, 255, 207, 0.86); }
 #hud #hud-time { color: rgba(214, 247, 255, 0.7); }
+#hud #hud-fps { color: rgba(255, 215, 165, 0.7); }
 
 #piano {
   position: fixed;

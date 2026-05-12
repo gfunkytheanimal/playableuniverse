@@ -43,6 +43,7 @@ export class AdvancedPanel {
       ['Point size', 'pointSize', 0.4, 8.0, 0.1],
       ['Bloom', 'bloomStrength', 0.0, 3.5, 0.05],
       ['Exposure', 'exposure', 0.3, 3.0, 0.05],
+      ['Trail strength', 'trailStrength', 0.0, 0.95, 0.01],
       ['Film grain', 'filmGrain', 0.0, 0.6, 0.01],
       ['Vignette', 'vignette', 0.0, 1.2, 0.02]
     ]);

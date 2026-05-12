@@ -64,6 +64,15 @@ const HIGHPASS_FRAG = `
     gl_FragColor = vec4(c * k, 1.0);
   }
 `;
+const FADE_FRAG = `
+  precision highp float;
+  varying vec2 vUv;
+  uniform sampler2D uPrev;
+  uniform float uFade;
+  void main() {
+    gl_FragColor = vec4(texture2D(uPrev, vUv).rgb * uFade, 1.0);
+  }
+`;
 
 export class PostStack {
   constructor(renderer) {
@@ -75,6 +84,7 @@ export class PostStack {
     const opts = { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
 
     this.scene = new THREE.WebGLRenderTarget(w, h, opts);
+    this.fadeTarget = new THREE.WebGLRenderTarget(w, h, opts);
     this.highpass = new THREE.WebGLRenderTarget(w / 2, h / 2, opts);
     this.blurA = new THREE.WebGLRenderTarget(w / 4, h / 4, opts);
     this.blurB = new THREE.WebGLRenderTarget(w / 4, h / 4, opts);
@@ -91,6 +101,10 @@ export class PostStack {
     this.blurMat = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: BLUR_FRAG,
       uniforms: { uSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uDir: { value: new THREE.Vector2(1, 0) } }
+    });
+    this.fadeMat = new THREE.ShaderMaterial({
+      vertexShader: VERT, fragmentShader: FADE_FRAG,
+      uniforms: { uPrev: { value: null }, uFade: { value: 0.9 } }
     });
     this.toneMat = new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: TONEMAP_FRAG,
@@ -114,15 +128,31 @@ export class PostStack {
     if (s.x === this.size.x && s.y === this.size.y) return;
     this.size.copy(s);
     this.scene.setSize(s.x, s.y);
+    this.fadeTarget.setSize(s.x, s.y);
     this.highpass.setSize(s.x / 2, s.y / 2);
     this.blurA.setSize(s.x / 4, s.y / 4);
     this.blurB.setSize(s.x / 4, s.y / 4);
   }
 
-  beginScene() {
+  beginScene(trailStrength = 0) {
     this.resize();
+    if (trailStrength <= 0.005) {
+      this.renderer.setRenderTarget(this.scene);
+      this.renderer.clear(true, false, false);
+      return;
+    }
+    // Carry forward last frame's scene at (1 - trailStrength), then render
+    // new geometry into the result. Streaks accumulate at strength*100%, so
+    // at 0.9 only ~10% of last frame survives — a wisp of motion blur.
+    this.fadeMat.uniforms.uPrev.value = this.scene.texture;
+    this.fadeMat.uniforms.uFade.value = 1.0 - trailStrength;
+    this.quad.material = this.fadeMat;
+    this.renderer.setRenderTarget(this.fadeTarget);
+    this.renderer.render(this.fsScene, this.fsCam);
+    const tmp = this.scene;
+    this.scene = this.fadeTarget;
+    this.fadeTarget = tmp;
     this.renderer.setRenderTarget(this.scene);
-    this.renderer.clear(true, false, false);
   }
 
   finish(params = {}) {

@@ -13,9 +13,10 @@ const PALETTE = {
 };
 
 export class EncounterDirector {
-  constructor(bus, { onFlash } = {}) {
+  constructor(bus, { onFlash, synth } = {}) {
     this.bus = bus;
     this.onFlash = onFlash;
+    this.synth = synth;
     this.timer = 8;
     this.minGap = 7;
     this.maxGap = 22;
@@ -105,6 +106,7 @@ export class EncounterDirector {
       }
     });
     this.onFlash?.({ intensity: 1, position: pos, color: PALETTE.supernova });
+    this.synth?.playSupernova(1.0);
   }
 
   _comet(time) {
@@ -140,6 +142,7 @@ export class EncounterDirector {
       }
     });
     this.onFlash?.({ intensity: 0.5, position: start, color });
+    this.synth?.playCometSweep(0.55);
   }
 
   _pulsar(time) {
@@ -165,6 +168,7 @@ export class EncounterDirector {
             band: 'mid'
           });
           this.onFlash?.({ intensity: 0.3, position: pos, color: PALETTE.pulsar });
+          this.synth?.playPulsarBeat(0.7);
         }
       }
     });
@@ -195,6 +199,7 @@ export class EncounterDirector {
       band: 'lowMid'
     });
     this.onFlash?.({ intensity: 0.4, position: pos, color: PALETTE.wave });
+    this.synth?.playWaveDrone(0.5);
   }
 
   _collision(time) {
@@ -221,6 +226,7 @@ export class EncounterDirector {
             band: 'high'
           });
           this.onFlash?.({ intensity: 0.9, position: meet, color: PALETTE.collision });
+          this.synth?.playCollisionCrack(0.95);
         }
       }
     });
