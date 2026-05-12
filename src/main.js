@@ -43,6 +43,7 @@ const params = {
   palette: 'spectral',
   filmGrain: 0.08,
   vignette: 0.45,
+  trailStrength: 0.4,
   encounterRate: 1.0,
   synthVolume: 0.32,
   synthWaveform: 'triangle',
@@ -105,16 +106,17 @@ bus.on('event', (e) => mapper.handle(e, clock.now));
 let impactPulse = 0;
 let sustainHeld = false;
 
-const encounters = new EncounterDirector(bus, {
-  onFlash: ({ intensity }) => {
-    impactPulse = Math.min(1.3, impactPulse + intensity * 0.55);
-  }
-});
-
 const synth = new Synth();
 synth.setVolume(params.synthVolume);
 synth.setWaveform(params.synthWaveform);
 synth.setCutoff(params.synthCutoff);
+
+const encounters = new EncounterDirector(bus, {
+  onFlash: ({ intensity }) => {
+    impactPulse = Math.min(1.3, impactPulse + intensity * 0.55);
+  },
+  synth
+});
 
 let firstInteraction = true;
 const dropOverlay = document.getElementById('drop-overlay');
@@ -166,7 +168,8 @@ window.addEventListener('drop', (e) => {
 
 const hud = new HUD({
   scaleEl: document.getElementById('hud-scale'),
-  timeEl: document.getElementById('hud-time')
+  timeEl: document.getElementById('hud-time'),
+  fpsEl: document.getElementById('hud-fps')
 }, clock, scaleCamera);
 
 const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), params, {
@@ -217,6 +220,35 @@ window.addEventListener('resize', () => {
   post.resize();
 });
 
+// Double-click in space drops a force at the world position under the cursor.
+// Direct sculpting: click in voids to attract material, near clusters to
+// disturb them. Shift+dblclick spawns an outward shock instead.
+const clickRaycaster = new THREE.Raycaster();
+const clickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const clickHit = new THREE.Vector3();
+const clickNdc = new THREE.Vector2();
+canvas.addEventListener('dblclick', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  clickNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  clickNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  clickRaycaster.setFromCamera(clickNdc, engine.camera);
+  if (!clickRaycaster.ray.intersectPlane(clickPlane, clickHit)) return;
+  const burst = e.shiftKey;
+  const pos = [clickHit.x, clickHit.y, clickHit.z];
+  bus.emit('event', {
+    type: 'impulse',
+    kind: burst ? 'shell' : 'well',
+    band: burst ? 'high' : 'mid',
+    strength: burst ? 1.3 : 1.0,
+    lifetime: burst ? 1.8 : 4.5,
+    position: pos,
+    axis: [Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5],
+    color: burst ? [1.4, 1.2, 0.8] : [0.85, 1.1, 1.5]
+  });
+  impactPulse = Math.min(1.3, impactPulse + 0.45);
+  dismissOverlay();
+});
+
 const loop = new Loop({
   step: (dt) => {
     clock.advance(dt, false);
@@ -253,8 +285,10 @@ const loop = new Loop({
       time: clock.now
     });
 
-    post.beginScene();
-    engine.renderer.clear(true, true, false);
+    post.beginScene(params.trailStrength);
+    // depth needs to be cleared each frame even when we fade colour, so
+    // starfield depth-test still works.
+    engine.renderer.clear(false, true, false);
     engine.renderer.render(engine.scene, engine.camera);
     post.finish({
       bloomStrength: params.bloomStrength * (1 + impactPulse * 0.4),
@@ -264,6 +298,7 @@ const loop = new Loop({
       time: clock.now
     });
 
+    hud.tick(dt);
     hud.update();
   }
 });
