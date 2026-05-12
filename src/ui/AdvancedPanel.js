@@ -18,6 +18,7 @@ export class AdvancedPanel {
       ['Force gain', 'forceGain', 0.2, 4.0, 0.05],
       ['Damping', 'damping', 0.9, 0.9999, 0.0005],
       ['Swirl bias', 'swirlBias', 0.0, 3.0, 0.05],
+      ['Expansion', 'expansion', 0.0, 2.5, 0.05],
       ['Time scale', 'timeScale', 0.1, 3.0, 0.05],
       ['Origin strength', 'originStrength', 0.0, 2.0, 0.05]
     ]);

@@ -35,7 +35,7 @@ const DECAY_FRAG = `
   }
 `;
 
-export const MEMORY_HALF_EXTENT = 220.0;
+export const MEMORY_HALF_EXTENT = 320.0;
 
 export class MemoryField {
   constructor(renderer) {

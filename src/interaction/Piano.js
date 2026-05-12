@@ -1,26 +1,28 @@
 const LOWER_ROW = [
-  { code: 'KeyA', note: 0,  band: 'sub',     kind: 'well',   label: 'A' },
-  { code: 'KeyS', note: 2,  band: 'bass',    kind: 'well',   label: 'S' },
-  { code: 'KeyD', note: 4,  band: 'bass',    kind: 'vortex', label: 'D' },
-  { code: 'KeyF', note: 5,  band: 'lowMid',  kind: 'vortex', label: 'F' },
-  { code: 'KeyG', note: 7,  band: 'lowMid',  kind: 'ribbon', label: 'G' },
-  { code: 'KeyH', note: 9,  band: 'mid',     kind: 'ribbon', label: 'H' },
-  { code: 'KeyJ', note: 11, band: 'mid',     kind: 'vortex', label: 'J' },
-  { code: 'KeyK', note: 12, band: 'mid',     kind: 'well',   label: 'K' }
+  { code: 'KeyA', note: 0,  band: 'sub',     kind: 'well',   waveform: 'triangle', label: 'A' },
+  { code: 'KeyS', note: 2,  band: 'bass',    kind: 'well',   waveform: 'triangle', label: 'S' },
+  { code: 'KeyD', note: 4,  band: 'bass',    kind: 'vortex', waveform: 'triangle', label: 'D' },
+  { code: 'KeyF', note: 5,  band: 'lowMid',  kind: 'vortex', waveform: 'sine',     label: 'F' },
+  { code: 'KeyG', note: 7,  band: 'lowMid',  kind: 'ribbon', waveform: 'sine',     label: 'G' },
+  { code: 'KeyH', note: 9,  band: 'mid',     kind: 'ribbon', waveform: 'triangle', label: 'H' },
+  { code: 'KeyJ', note: 11, band: 'mid',     kind: 'vortex', waveform: 'triangle', label: 'J' },
+  { code: 'KeyK', note: 12, band: 'mid',     kind: 'well',   waveform: 'triangle', label: 'K' }
 ];
 
 const UPPER_ROW = [
-  { code: 'KeyQ', note: 14, band: 'highMid', kind: 'shell',  label: 'Q' },
-  { code: 'KeyW', note: 16, band: 'highMid', kind: 'shell',  label: 'W' },
-  { code: 'KeyE', note: 18, band: 'high',    kind: 'shell',  label: 'E' },
-  { code: 'KeyR', note: 19, band: 'high',    kind: 'shell',  label: 'R' },
-  { code: 'KeyT', note: 21, band: 'high',    kind: 'ribbon', label: 'T' },
-  { code: 'KeyY', note: 23, band: 'high',    kind: 'vortex', label: 'Y' },
-  { code: 'KeyU', note: 24, band: 'high',    kind: 'shell',  label: 'U' },
-  { code: 'KeyI', note: 26, band: 'high',    kind: 'shell',  label: 'I' }
+  { code: 'KeyQ', note: 14, band: 'highMid', kind: 'shell',  waveform: 'sawtooth', label: 'Q' },
+  { code: 'KeyW', note: 16, band: 'highMid', kind: 'shell',  waveform: 'sawtooth', label: 'W' },
+  { code: 'KeyE', note: 18, band: 'high',    kind: 'shell',  waveform: 'sawtooth', label: 'E' },
+  { code: 'KeyR', note: 19, band: 'high',    kind: 'shell',  waveform: 'square',   label: 'R' },
+  { code: 'KeyT', note: 21, band: 'high',    kind: 'ribbon', waveform: 'square',   label: 'T' },
+  { code: 'KeyY', note: 23, band: 'high',    kind: 'vortex', waveform: 'square',   label: 'Y' },
+  { code: 'KeyU', note: 24, band: 'high',    kind: 'shell',  waveform: 'sawtooth', label: 'U' },
+  { code: 'KeyI', note: 26, band: 'high',    kind: 'shell',  waveform: 'sawtooth', label: 'I' }
 ];
 
-const ALL_KEYS = [...LOWER_ROW, ...UPPER_ROW];
+const DRUM_KEY = { code: 'Space', band: 'broadband', kind: 'shell', drum: true, label: 'SPACE' };
+
+const ALL_KEYS = [...LOWER_ROW, ...UPPER_ROW, DRUM_KEY];
 const BY_CODE = Object.fromEntries(ALL_KEYS.map((k) => [k.code, k]));
 
 export class Piano {
@@ -83,6 +85,24 @@ export class Piano {
 
   trigger(info, strength) {
     this.eventTime += 0.001;
+    if (info.drum) {
+      if (this.synth) this.synth.playDrum(strength);
+      // Drum spawns a wide outward shock from a varying random position
+      const phi = this.eventTime * 7.3 % (Math.PI * 2);
+      const r = 60 + (this.eventTime * 19) % 80;
+      const position = [Math.cos(phi) * r, (Math.sin(phi * 1.7) - 0.5) * 28, Math.sin(phi) * r];
+      this.bus.emit('event', {
+        type: 'impulse',
+        kind: 'shell',
+        band: 'broadband',
+        time: this.eventTime,
+        strength: 1,
+        position,
+        axis: [Math.cos(phi), 0, Math.sin(phi)]
+      });
+      if (this.onTrigger) this.onTrigger(info);
+      return;
+    }
     const angle = (info.note / 12) * Math.PI * 2;
     const radius = 60 + (info.note % 5) * 18;
     const position = [
@@ -90,7 +110,10 @@ export class Piano {
       ((info.note % 12) - 6) * 1.8,
       Math.sin(angle) * radius
     ];
-    if (this.synth) this.synth.playNote(info.note, strength);
+    if (this.synth) this.synth.playNote(info.note, strength, { waveform: info.waveform });
+    // Isotropic axis — different per note, no Y bias
+    const axisT = info.note * 0.41;
+    const axis = [Math.sin(axisT * 1.3), Math.cos(axisT * 0.9), Math.cos(axisT * 1.7)];
     this.bus.emit('event', {
       type: 'impulse',
       kind: info.kind,
@@ -98,7 +121,7 @@ export class Piano {
       time: this.eventTime,
       strength,
       position,
-      axis: [Math.sin(angle * 1.3), 0.7, Math.cos(angle * 1.7)],
+      axis,
       pitch: info.note
     });
     if (this.onTrigger) this.onTrigger(info);

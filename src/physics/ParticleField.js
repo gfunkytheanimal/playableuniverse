@@ -57,6 +57,7 @@ const VEL_FRAG = `
   uniform float uForceGain;
   uniform float uDamping;
   uniform float uSwirlBias;
+  uniform float uExpansion;
   uniform int uForceCount;
   uniform vec4 uForcePos[${MAX_SOURCES}];
   uniform vec4 uForceMeta[${MAX_SOURCES}];
@@ -130,6 +131,12 @@ const VEL_FRAG = `
     float fa = (family / 12.0) * 6.2831853;
     accel += vec3(cos(fa + uTime * 0.05), 0.0, sin(fa + uTime * 0.05)) * 0.04 * (0.4 + uSongEnergy);
 
+    // Cosmological expansion: gentle radial outward drift, amplified by audio
+    // energy so loud passages literally inflate the field. This is the
+    // counter-force that stops everything from piling at the centre.
+    float pr = length(p) + 1.0;
+    accel += (p / pr) * uExpansion * (0.6 + uSongEnergy * 4.5);
+
     // accel clamp to prevent blow-ups when near a force center
     float amag = length(accel);
     if (amag > 220.0) accel *= 220.0 / amag;
@@ -138,10 +145,10 @@ const VEL_FRAG = `
     v += accel * uDt;
     // damping (gentler so orbits persist) — user-tunable
     v *= pow(clamp(uDamping, 0.85, 0.9999), uDt * 60.0);
-    // soft confinement
+    // soft confinement — sized so the expansion term still has somewhere to go
     float radius = length(p);
-    float bound = 260.0;
-    if (radius > bound) v -= normalize(p) * (radius - bound) * 0.18;
+    float bound = 360.0;
+    if (radius > bound) v -= normalize(p) * (radius - bound) * 0.22;
 
     // velocity clamp
     float vmag = length(v);
@@ -167,7 +174,7 @@ const POS_FRAG = `
 `;
 
 export class ParticleField {
-  constructor(renderer, { count = 65536, seed = 1 } = {}) {
+  constructor(renderer, { count = 262144, seed = 1 } = {}) {
     this.renderer = renderer;
     const res = Math.ceil(Math.sqrt(count));
     this.texRes = res;
@@ -220,8 +227,9 @@ export class ParticleField {
         uMemoryHalfExtent: { value: MEMORY_HALF_EXTENT },
         uSongEnergy: { value: 0 },
         uForceGain: { value: 1 },
-        uDamping: { value: 0.993 },
+        uDamping: { value: 0.997 },
         uSwirlBias: { value: 1 },
+        uExpansion: { value: 0.4 },
         uForceCount: { value: 0 },
         uForcePos: { value: this.forcePos },
         uForceMeta: { value: this.forceMeta }
@@ -270,8 +278,9 @@ export class ParticleField {
     this.velMat.uniforms.uTime.value = songTime;
     this.velMat.uniforms.uSongEnergy.value = songEnergy;
     this.velMat.uniforms.uForceGain.value = opts.forceGain ?? 1;
-    this.velMat.uniforms.uDamping.value = opts.damping ?? 0.993;
+    this.velMat.uniforms.uDamping.value = opts.damping ?? 0.997;
     this.velMat.uniforms.uSwirlBias.value = opts.swirlBias ?? 1;
+    this.velMat.uniforms.uExpansion.value = opts.expansion ?? 0.4;
     this.velMat.uniforms.uForceCount.value = count;
     this.velMat.uniforms.uForcePos.value = this.forcePos;
     this.velMat.uniforms.uForceMeta.value = this.forceMeta;
