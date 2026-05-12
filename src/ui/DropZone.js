@@ -1,14 +1,22 @@
 export class DropZone {
-  constructor({ overlay, button, input }, onFile) {
+  constructor({ overlay, button, input, structureButton, structureInput }, { onAudio, onStructure }) {
     this.overlay = overlay;
     this.button = button;
     this.input = input;
-    this.onFile = onFile;
+    this.structureButton = structureButton;
+    this.structureInput = structureInput;
+    this.onAudio = onAudio;
+    this.onStructure = onStructure;
     this.dismissed = false;
 
     button?.addEventListener('click', () => this.input?.click());
     input?.addEventListener('change', () => {
       const file = this.input.files?.[0];
+      if (file) this._consume(file);
+    });
+    structureButton?.addEventListener('click', () => this.structureInput?.click());
+    structureInput?.addEventListener('change', () => {
+      const file = this.structureInput.files?.[0];
       if (file) this._consume(file);
     });
     window.addEventListener('dragover', (e) => {
@@ -21,8 +29,8 @@ export class DropZone {
     window.addEventListener('drop', (e) => {
       e.preventDefault();
       if (this.overlay) this.overlay.dataset.state = 'idle';
-      const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('audio/'));
-      if (file) this._consume(file);
+      const files = [...(e.dataTransfer?.files ?? [])];
+      for (const file of files) this._consume(file);
     });
   }
 
@@ -34,6 +42,14 @@ export class DropZone {
 
   _consume(file) {
     this.dismissOverlay();
-    try { this.onFile(file); } catch (err) { console.error(err); }
+    const name = (file.name || '').toLowerCase();
+    const isModel = name.endsWith('.glb') || name.endsWith('.gltf') || file.type === 'model/gltf-binary' || file.type === 'model/gltf+json';
+    try {
+      if (isModel && this.onStructure) this.onStructure(file);
+      else if (file.type.startsWith('audio/') && this.onAudio) this.onAudio(file);
+      else if (this.onAudio) this.onAudio(file);
+    } catch (err) {
+      console.error(err);
+    }
   }
 }

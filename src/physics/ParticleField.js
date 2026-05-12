@@ -108,17 +108,22 @@ const VEL_FRAG = `
       }
     }
 
-    // memory bias: top-down projection
+    // memory bias: top-down projection.
+    // Particles flow ALONG memory ridges (curl of gradient) instead of falling
+    // straight up the gradient. Stops the runaway "everything piles where the
+    // most events happened" loop and produces filament-like flow.
     vec2 muv = (p.xz / uMemoryHalfExtent) * 0.5 + 0.5;
-    if (muv.x > 0.0 && muv.x < 1.0 && muv.y > 0.0 && muv.y < 1.0) {
+    if (muv.x > 0.02 && muv.x < 0.98 && muv.y > 0.02 && muv.y < 0.98) {
       vec4 mem = texture2D(uMemory, muv);
-      vec3 gradient = vec3(
-        texture2D(uMemory, muv + vec2(0.01, 0.0)).r - texture2D(uMemory, muv - vec2(0.01, 0.0)).r,
-        0.0,
-        texture2D(uMemory, muv + vec2(0.0, 0.01)).r - texture2D(uMemory, muv - vec2(0.0, 0.01)).r
-      );
-      accel += gradient * 18.0;
-      accel.y += (mem.g - 0.05) * 1.2;
+      float gx = texture2D(uMemory, muv + vec2(0.012, 0.0)).r - texture2D(uMemory, muv - vec2(0.012, 0.0)).r;
+      float gz = texture2D(uMemory, muv + vec2(0.0, 0.012)).r - texture2D(uMemory, muv - vec2(0.0, 0.012)).r;
+      vec3 curl = vec3(-gz, 0.0, gx);
+      accel += curl * 28.0;
+      // Bounded pull toward peaks (drops off where gradient is steep — keeps
+      // particles from impaling themselves on a single hot pixel).
+      vec3 grad = vec3(gx, 0.0, gz);
+      float gMag = length(grad) + 0.02;
+      accel += grad * (mem.r * 4.0) / (1.0 + gMag * 12.0);
     }
 
     // mild self-organising drift toward family-aligned circulation

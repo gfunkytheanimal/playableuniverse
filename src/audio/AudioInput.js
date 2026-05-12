@@ -24,18 +24,21 @@ export class AudioInput {
 
   async loadFile(file) {
     this.ensureContext();
+    // Resume BEFORE creating the source — Chromium will hand the analyser
+    // silence if the context is suspended when createMediaElementSource fires.
+    await this.context.resume();
     if (this.audioEl) {
       this.audioEl.pause();
       try { this.source?.disconnect(); } catch (_) {}
     }
     const url = URL.createObjectURL(file);
     this.audioEl = new Audio(url);
-    this.audioEl.crossOrigin = 'anonymous';
+    // Do NOT set crossOrigin for blob URLs — Chromium taints the stream and
+    // the analyser sees zeros even though playback works.
     this.audioEl.preload = 'auto';
     this.fingerprintSeed = seedFromName(file.name) ^ Math.floor(file.size);
     this.source = this.context.createMediaElementSource(this.audioEl);
     this.source.connect(this.analyser);
-    await this.context.resume();
     await this.audioEl.play();
     if (this.onSongStart) this.onSongStart(this.audioEl.duration || 0, this.fingerprintSeed);
   }
