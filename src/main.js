@@ -5,6 +5,7 @@ import { Clock } from './engine/Clock.js';
 import { EventBus } from './audio/EventBus.js';
 import { EventMapper } from './cosmology/EventMapper.js';
 import { EncounterDirector } from './cosmology/EncounterDirector.js';
+import { EncounterObjects } from './cosmology/EncounterObjects.js';
 import { ForceSources } from './physics/ForceSources.js';
 import { MemoryField } from './physics/MemoryField.js';
 import { ParticleField } from './physics/ParticleField.js';
@@ -102,7 +103,7 @@ scaleCamera.setFocusProvider(() => {
 const mapper = new EventMapper({ forces, memory });
 bus.on('event', (e) => mapper.handle(e, clock.now));
 
-// Brief visual impact pulse driven by piano hits AND cosmic encounters.
+// Brief visual impact pulse driven by piano hits.
 let impactPulse = 0;
 let sustainHeld = false;
 
@@ -111,12 +112,9 @@ synth.setVolume(params.synthVolume);
 synth.setWaveform(params.synthWaveform);
 synth.setCutoff(params.synthCutoff);
 
-const encounters = new EncounterDirector(bus, {
-  onFlash: ({ intensity }) => {
-    impactPulse = Math.min(1.3, impactPulse + intensity * 0.55);
-  },
-  synth
-});
+const encounterObjects = new EncounterObjects(engine.scene, bus, { synth });
+encounterObjects.setRenderer(engine.renderer);
+const encounters = new EncounterDirector(bus, { objects: encounterObjects });
 
 let firstInteraction = true;
 const dropOverlay = document.getElementById('drop-overlay');
@@ -190,6 +188,8 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
       memory.clear();
     } else if (action === 'clearStructures') {
       structures.clear();
+    } else if (action === 'clearEncounters') {
+      encounterObjects.clear();
     } else if (action === 'recenter') {
       scaleCamera.recenter();
     } else if (action === 'encounter') {
@@ -258,7 +258,8 @@ const loop = new Loop({
     memory.decay(dt, params.memoryDecay);
     mapper.tick(dt);
     encounters.rate = params.encounterRate;
-    encounters.update(dt, clock.now);
+    encounters.update(dt);
+    encounterObjects.update(dt, clock.now);
 
     density.update(params.planeThickness);
 

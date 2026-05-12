@@ -67,6 +67,7 @@ export class AdvancedPanel {
     ]);
     this._actions([
       ['Trigger Encounter', 'encounter'],
+      ['Clear Encounters', 'clearEncounters'],
       ['Recenter Camera', 'recenter'],
       ['Reset Universe', 'reset'],
       ['Clear Memory', 'clearMemory'],

@@ -191,11 +191,15 @@ const VEL_FRAG = `
     v += accel * uDt;
     // damping (gentler so orbits persist) — user-tunable
     v *= pow(clamp(uDamping, 0.85, 0.9999), uDt * 60.0);
-    // soft confinement — gentle bounce so particles can drift through the
-    // boundary instead of sticking to it.
+    // soft confinement — gentle bounce up to a threshold, then much
+    // stronger pullback once particles get far enough out that a stray
+    // supernova could otherwise lose them.
     float radius = length(p);
     float bound = 360.0;
-    if (radius > bound) v -= normalize(p) * (radius - bound) * 0.08;
+    if (radius > bound) {
+      float excess = radius - bound;
+      v -= normalize(p) * (excess * 0.08 + max(0.0, excess - 60.0) * 0.5);
+    }
 
     // velocity clamp
     float vmag = length(v);
@@ -215,6 +219,12 @@ const POS_FRAG = `
     vec4 pos = texture2D(uPos, vUv);
     vec4 vel = texture2D(uVel, vUv);
     vec3 p = pos.xyz + vel.xyz * uDt;
+    // Hard radial clamp — anything past the absolute boundary gets snapped
+    // back. A strong shell (supernova, collision) can otherwise eject
+    // particles far enough that the soft confinement can't recover them and
+    // the universe slowly drains to infinity.
+    float r = length(p);
+    if (r > 520.0) p = normalize(p) * 520.0;
     float age = pos.w + uDt;
     gl_FragColor = vec4(p, age);
   }
