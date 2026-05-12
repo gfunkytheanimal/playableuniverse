@@ -4,6 +4,7 @@ import { Loop } from './engine/Loop.js';
 import { Clock } from './engine/Clock.js';
 import { EventBus } from './audio/EventBus.js';
 import { EventMapper } from './cosmology/EventMapper.js';
+import { EncounterDirector } from './cosmology/EncounterDirector.js';
 import { ForceSources } from './physics/ForceSources.js';
 import { MemoryField } from './physics/MemoryField.js';
 import { ParticleField } from './physics/ParticleField.js';
@@ -42,6 +43,7 @@ const params = {
   palette: 'spectral',
   filmGrain: 0.08,
   vignette: 0.45,
+  encounterRate: 1.0,
   synthVolume: 0.32,
   synthWaveform: 'triangle',
   synthCutoff: 4400
@@ -99,6 +101,16 @@ scaleCamera.setFocusProvider(() => {
 const mapper = new EventMapper({ forces, memory });
 bus.on('event', (e) => mapper.handle(e, clock.now));
 
+// Brief visual impact pulse driven by piano hits AND cosmic encounters.
+let impactPulse = 0;
+let sustainHeld = false;
+
+const encounters = new EncounterDirector(bus, {
+  onFlash: ({ intensity }) => {
+    impactPulse = Math.min(1.3, impactPulse + intensity * 0.55);
+  }
+});
+
 const synth = new Synth();
 synth.setVolume(params.synthVolume);
 synth.setWaveform(params.synthWaveform);
@@ -111,10 +123,6 @@ function dismissOverlay() {
   firstInteraction = false;
   dropOverlay?.classList.add('dismissed');
 }
-
-// Brief visual impact pulse driven by piano hits.
-let impactPulse = 0;
-let sustainHeld = false;
 window.addEventListener('keydown', (e) => {
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') sustainHeld = true;
 });
@@ -181,6 +189,8 @@ const advanced = new AdvancedPanel(document.getElementById('advanced-panel'), pa
       structures.clear();
     } else if (action === 'recenter') {
       scaleCamera.recenter();
+    } else if (action === 'encounter') {
+      encounters.triggerNow();
     } else if (action.startsWith('preset:')) {
       const key = action.slice(7);
       const preset = PRESETS[key];
@@ -215,6 +225,8 @@ const loop = new Loop({
     forces.update(dt);
     memory.decay(dt, params.memoryDecay);
     mapper.tick(dt);
+    encounters.rate = params.encounterRate;
+    encounters.update(dt, clock.now);
 
     density.update(params.planeThickness);
 
@@ -237,7 +249,8 @@ const loop = new Loop({
       pointSize: params.pointSize * (1 + impactPulse * 0.35),
       memoryBlend: params.memoryBlend,
       hueShift: palette.hueShift,
-      paletteMix: palette.paletteMix
+      paletteMix: palette.paletteMix,
+      time: clock.now
     });
 
     post.beginScene();

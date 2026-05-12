@@ -36,7 +36,8 @@ export class AdvancedPanel {
     this._section('Cosmology', [
       ['Memory persistence', 'memoryDecay', 0.985, 1.0, 0.0005],
       ['Memory blend', 'memoryBlend', 0.0, 2.0, 0.05],
-      ['Spawn radius', 'spawnRadius', 20, 320, 2]
+      ['Spawn radius', 'spawnRadius', 20, 320, 2],
+      ['Encounter rate', 'encounterRate', 0.0, 3.0, 0.05]
     ]);
     this._section('Visuals', [
       ['Point size', 'pointSize', 0.4, 8.0, 0.1],
@@ -64,6 +65,7 @@ export class AdvancedPanel {
       ['Square (hollow)', 'square']
     ]);
     this._actions([
+      ['Trigger Encounter', 'encounter'],
       ['Recenter Camera', 'recenter'],
       ['Reset Universe', 'reset'],
       ['Clear Memory', 'clearMemory'],
